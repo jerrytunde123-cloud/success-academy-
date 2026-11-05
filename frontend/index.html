@@ -92,11 +92,22 @@
 
     <main id="page-history" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <h2 class="section-title">My Purchased PINs</h2>
-        <p style="text-align:center; margin-bottom:20px; color:#666;">These are the PINs you have purchased on this specific device. Click "Copy PIN" to use them.</p>
+        <p style="text-align:center; margin-bottom:20px; color:#666;">These are the PINs you have purchased on this specific device.</p>
         <div id="pin-history-container"></div>
     </main>
 
     <main id="page-verify" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
+        
+        <!-- Device ID Box -->
+        <div style="background: #eef2f5; border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+            <p style="font-size: 14px; color: #666; margin-bottom: 5px;">Your Unique Device ID:</p>
+            <h3 id="user-device-id-display" style="color: var(--primary-blue); letter-spacing: 1px; font-family: monospace; margin-bottom: 10px;">Loading...</h3>
+            <button onclick="copyDeviceId()" style="background: var(--accent-yellow); border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">
+                <i class="fas fa-copy"></i> Copy ID
+            </button>
+            <p style="font-size: 12px; color: #888; margin-top: 10px;">If you lose your PIN or have payment issues, send this ID to our <a href="https://t.me/Officialkingjay1" target="_blank" style="color: #0088cc;">Telegram Support</a>.</p>
+        </div>
+
         <div class="verify-box">
             <h2>Enter Your PIN to View Answers</h2>
             <input type="text" id="user-pin-input" placeholder="Enter 6-digit PIN" style="text-transform: uppercase;">
@@ -109,7 +120,6 @@
         </div>
     </main>
 
-    <!-- CHECKOUT MODAL -->
     <div id="checkout-modal" class="modal">
         <div class="modal-content">
             <h3>Checkout: <span id="checkout-title"></span></h3>
