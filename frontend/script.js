@@ -108,7 +108,7 @@ function payWithPaystack() {
     }
 
     let handler = PaystackPop.setup({
-        key: 'pk_test_YOUR_PAYSTACK_KEY', // ⚠️ INSERT PAYSTACK KEY HERE
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ INSERT PAYSTACK KEY HERE
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
