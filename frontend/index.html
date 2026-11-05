@@ -21,6 +21,7 @@
         <nav>
             <ul>
                 <li><a href="#" onclick="showPage('home')">Home</a></li>
+                <li><a href="#exams">Exams</a></li>
                 <li><a href="#" onclick="showPage('verify')">View Purchased PIN</a></li>
             </ul>
         </nav>
@@ -39,6 +40,8 @@
 
         <section id="contact" class="contact-section">
             <h2 class="section-title text-yellow">Contact Us Today</h2>
+            <p style="text-align: center; color: white; margin-bottom: 20px;">Let's build your future together! Serving Students Across Nigeria and West Africa.</p>
+            
             <div class="contact-info">
                 <div class="phone-number"><i class="fas fa-phone-alt"></i> +234 704 813 5078</div>
                 <div class="social-links">
@@ -87,20 +90,19 @@
         </div>
     </main>
 
-    <main id="page-view-content" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
-        <div class="verify-box" style="background:white; padding:30px; border-radius:10px;">
+    <main id="page-verify" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
+        <div class="verify-box">
             <h2>Enter Your PIN to View Answers</h2>
             <input type="text" id="user-pin-input" placeholder="Enter 6-digit PIN" style="text-transform: uppercase;">
             <button class="btn-buy" onclick="verifyAndShowContent()">Unlock Content</button>
             <p id="pin-error" style="color: red; margin-top: 10px; display: none;"></p>
         </div>
-        <div id="content-display" style="display: none; margin-top: 30px; background: white; padding: 20px; border-radius: 10px;">
-            <h3 style="color: var(--primary-blue);">Exam Answers</h3>
-            <div id="actual-answers" style="margin-top: 15px; font-family: monospace; white-space: pre-wrap;"></div>
+        <div id="content-display">
+            <h3>Exam Answers</h3>
+            <div id="actual-answers"></div>
         </div>
     </main>
 
-    <!-- CHECKOUT MODAL -->
     <div id="checkout-modal" class="modal">
         <div class="modal-content">
             <h3>Checkout: <span id="checkout-title"></span></h3>
@@ -116,7 +118,6 @@
         </div>
     </div>
 
-    <!-- SUCCESS MODAL -->
     <div id="success-modal" class="modal">
         <div class="modal-content" style="text-align: center;">
             <h3 style="color: green;">Payment Successful!</h3>
