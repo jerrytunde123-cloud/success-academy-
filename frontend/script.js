@@ -1,5 +1,5 @@
 // ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
-const API_URL = 'https://success-academy-backend-mh1o.onrender.com/'; 
+const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
 let dbExams = [];
 let currentExam = null;
@@ -30,7 +30,6 @@ function showPage(pageId) {
     document.querySelectorAll('main').forEach(main => main.style.display = 'none');
     document.getElementById('page-' + pageId).style.display = 'block';
     if(pageId === 'verify') displayDeviceId();
-    if(pageId === 'home') fetchExams(); // Refresh data when returning to home
 }
 
 async function fetchExams() {
@@ -40,7 +39,10 @@ async function fetchExams() {
         dbExams = await response.json();
         renderExams();
         checkSharedLink(); 
-    } catch (error) { console.error("Error fetching exams:", error); }
+    } catch (error) { 
+        console.error("Error fetching exams:", error); 
+        document.getElementById('home-exam-grid').innerHTML = '<p style="text-align:center; color:red;">Failed to load exams. Check your internet connection.</p>';
+    }
 }
 
 function renderExams() {
@@ -146,8 +148,7 @@ function payWithPaystack() {
     }
 
     let handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043
-', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_test_YOUR_PAYSTACK_KEY', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -182,7 +183,6 @@ async function verifyAndShowContent() {
     if(!inputPin) return alert("Please enter a PIN.");
 
     try {
-        // Force no-cache here too
         const response = await fetch(`${API_URL}/pins/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -234,6 +234,7 @@ async function verifyAndShowContent() {
     }
 }
 
+// Handle Contact Form Submission
 document.getElementById('enquiryForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     const data = {
@@ -244,8 +245,13 @@ document.getElementById('enquiryForm')?.addEventListener('submit', async functio
         message: document.getElementById('message').value
     };
     try {
-        await fetch(`${API_URL}/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        alert('Message sent successfully!'); this.reset();
+        await fetch(`${API_URL}/enquiries`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(data) 
+        });
+        alert('Message sent successfully!'); 
+        this.reset();
     } catch (err) { alert('Failed to send message.'); }
 });
 
