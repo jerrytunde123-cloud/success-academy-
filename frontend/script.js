@@ -171,43 +171,69 @@ async function generatePIN(selectedSubjects) {
 }
 
 async function verifyAndShowContent() {
-    const inputPin = document.getElementById('user-pin-input').value.toUpperCase();
+    const inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     const errorMsg = document.getElementById('pin-error');
+    
+    // Reset UI
+    errorMsg.style.display = 'none';
+    document.getElementById('content-display').style.display = 'none';
+
+    if(!inputPin) return alert("Please enter a PIN.");
+
     try {
         const response = await fetch(`${API_URL}/pins/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pin: inputPin, deviceId: getDeviceId() })
         });
-        const result = await response.json();
-        if (!response.ok) { errorMsg.innerText = result.error; errorMsg.style.display = 'block'; return; }
-
-        errorMsg.style.display = 'none';
-        document.getElementById('content-display').style.display = 'block';
-        const examInfo = dbExams.find(e => e._id === result.data.examId);
-        let contentText = "";
-        result.data.subjects.forEach(subName => {
-            const subjectData = examInfo.subjects.find(s => s.name === subName);
-            if (subjectData) contentText += `--- ${subjectData.name.toUpperCase()} ---\n${subjectData.content || 'No text content yet'}\n\n`;
-        });
-        document.getElementById('actual-answers').innerText = contentText;
         
-        // Display images if any exist
+        const result = await response.json();
+        
+        // If the backend says 404 (Invalid) or 403 (Wrong Device), show that error
+        if (!response.ok) { 
+            errorMsg.innerText = result.error || 'Invalid PIN'; 
+            errorMsg.style.display = 'block'; 
+            return; 
+        }
+
+        // Success!
+        document.getElementById('content-display').style.display = 'block';
+        
+        // Find the exam details
+        const examInfo = dbExams.find(e => e._id === result.data.examId._id);
+        let contentText = "";
+        
+        if (result.data.subjects) {
+            result.data.subjects.forEach(subName => {
+                const subjectData = examInfo.subjects.find(s => s.name === subName);
+                if (subjectData) {
+                    contentText += `--- ${subjectData.name.toUpperCase()} ---\n${subjectData.content || 'No text content yet'}\n\n`;
+                }
+            });
+        }
+        
         const answersDiv = document.getElementById('actual-answers');
         answersDiv.innerHTML = `<pre style="font-family:monospace; white-space:pre-wrap;">${contentText}</pre>`;
         
-        result.data.subjects.forEach(subName => {
-            const subjectData = examInfo.subjects.find(s => s.name === subName);
-            if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
-                answersDiv.innerHTML += `<h4 style="margin-top:15px; color:var(--primary-blue);">${subName} Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">`;
-                subjectData.qaImages.forEach(imgUrl => {
-                    answersDiv.innerHTML += `<img src="${imgUrl}" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">`;
-                });
-                answersDiv.innerHTML += `</div>`;
-            }
-        });
+        // Append Images
+        if (result.data.subjects) {
+            result.data.subjects.forEach(subName => {
+                const subjectData = examInfo.subjects.find(s => s.name === subName);
+                if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
+                    answersDiv.innerHTML += `<h4 style="margin-top:15px; color:var(--primary-blue);">${subName} Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">`;
+                    subjectData.qaImages.forEach(imgUrl => {
+                        answersDiv.innerHTML += `<img src="${imgUrl}" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">`;
+                    });
+                    answersDiv.innerHTML += `</div>`;
+                }
+            });
+        }
 
-    } catch (error) { errorMsg.innerText = 'Connection error.'; errorMsg.style.display = 'block'; }
+    } catch (error) { 
+        console.error(error);
+        errorMsg.innerText = 'Connection error. Please try again later.'; 
+        errorMsg.style.display = 'block'; 
+    }
 }
 
 document.getElementById('enquiryForm')?.addEventListener('submit', async function(e) {
