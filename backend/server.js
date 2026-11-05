@@ -13,7 +13,7 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
 // ⚠️ PUT YOUR MONGODB CONNECTION STRING HERE ⚠️
-const MONGO_URI = 'mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@cluster0.xxxxx.mongodb.net/success_academy?retryWrites=true&w=majority';
+const MONGO_URI = 'mongodb+srv://jerrytunde123_db_user:<Jerry/2007>@cluster.f4jypw9.mongodb.net/success_academy?retryWrites=true&w=majority';
 
 mongoose.connect(MONGO_URI)
 .then(async () => {
