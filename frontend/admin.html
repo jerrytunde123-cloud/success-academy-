@@ -47,7 +47,7 @@
     <div id="dashboard" class="container">
         <div class="header">
             <h1>Admin Dashboard</h1>
-            <a href="index.html" style="background:#ff4444; color:white; padding:10px; text-decoration:none; border-radius:5px;">Log Out</a>
+            <button onclick="logout()" style="background:#ff4444; color:white; padding:10px; text-decoration:none; border-radius:5px; border:none; cursor:pointer;">Log Out</button>
         </div>
 
         <div class="tabs">
@@ -138,8 +138,19 @@
     </div>
 
     <script>
-        // ⚠️ ADMIN PASSWORD (Change this to whatever you want)
+        // ⚠️ ALL CONFIGURATIONS MOVED TO THE TOP TO PREVENT ERRORS
         const ADMIN_PASSWORD = "admin123"; 
+        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // Replace with your Render URL if different
+        
+        // EMAILJS CONFIG
+        emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
+        const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
+        const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+
+        let exams = [];
+        let activeExam = null;
+        let activeSubject = null;
+        let currentReplyData = null;
 
         // Check if already logged in
         if(localStorage.getItem('sa_admin_logged_in') === 'true') {
@@ -160,18 +171,10 @@
             }
         }
 
-        // ⚠️ EMAILJS CONFIG
-        emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
-        const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
-        const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
-
-        // ⚠️ BACKEND URL
-        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
-        
-        let exams = [];
-        let activeExam = null;
-        let activeSubject = null;
-        let currentReplyData = null;
+        function logout() {
+            localStorage.removeItem('sa_admin_logged_in');
+            window.location.reload();
+        }
 
         function switchTab(tabId, event) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -434,11 +437,6 @@
                 status.style.color = 'red';
                 status.innerText = 'Failed to send email.';
             }
-        }
-
-        function logout() {
-            localStorage.removeItem('sa_admin_logged_in');
-            window.location.href = 'index.html';
         }
     </script>
 </body>
