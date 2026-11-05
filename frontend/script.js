@@ -5,7 +5,6 @@ let currentExam = null;
 let currentPackageType = null;
 let currentPrice = 0;
 
-// --- DEVICE ID & LOCAL PIN STORAGE ---
 function getDeviceId() {
     let deviceId = localStorage.getItem('sa_device_id');
     if (!deviceId) {
@@ -15,58 +14,16 @@ function getDeviceId() {
     return deviceId;
 }
 
-function savePinLocally(pinData) {
-    let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
-    // Prevent duplicates
-    if(!history.some(p => p.pin === pinData.pin)) {
-        history.push(pinData);
-        localStorage.setItem('sa_my_pins', JSON.stringify(history));
-    }
+// Show Device ID to user so they can send it to admin if they lose PIN
+function displayDeviceId() {
+    const display = document.getElementById('user-device-id-display');
+    if(display) display.innerText = getDeviceId();
 }
 
-function loadMyPinHistory() {
-    const container = document.getElementById('pin-history-container');
-    if (!container) return;
-    container.innerHTML = '';
-    let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
-    
-    if (history.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:#666;">You have not purchased any PINs on this device yet.</p>';
-        return;
-    }
-
-    history.reverse().forEach(item => {
-        // Find exam name
-        const exam = dbExams.find(e => e._id === item.examId);
-        const examName = exam ? exam.name : 'Unknown Exam';
-        const date = new Date(item.date).toLocaleDateString();
-        const subjects = item.subjects.join(', ');
-
-        container.innerHTML += `
-            <div style="background:white; border:1px solid #ddd; padding:15px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <h4 style="color:var(--primary-blue); margin-bottom:5px;">${examName} <span style="font-size:12px; color:#666;">(${date})</span></h4>
-                    <p style="font-size:14px; color:#444;"><strong>Subjects:</strong> ${subjects}</p>
-                </div>
-                <div style="text-align:center;">
-                    <h3 style="color:green; letter-spacing:2px; margin-bottom:5px;">${item.pin}</h3>
-                    <button onclick="copyToClipboard('${item.pin}')" style="background:#25D366; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-size:12px;">Copy PIN</button>
-                </div>
-            </div>
-        `;
-    });
-}
-
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text);
-    alert('Copied: ' + text);
-}
-
-// --- NAVIGATION & RENDERING ---
 function showPage(pageId) {
     document.querySelectorAll('main').forEach(main => main.style.display = 'none');
     document.getElementById('page-' + pageId).style.display = 'block';
-    if(pageId === 'history') loadMyPinHistory();
+    if(pageId === 'verify') displayDeviceId();
 }
 
 async function fetchExams() {
@@ -74,7 +31,7 @@ async function fetchExams() {
         const response = await fetch(`${API_URL}/exams`);
         dbExams = await response.json();
         renderExams();
-        checkSharedLink(); // Check if user is visiting via a share link
+        checkSharedLink(); 
     } catch (error) { console.error("Error fetching exams:", error); }
 }
 
@@ -92,19 +49,20 @@ function renderExams() {
     });
 }
 
-// SHAREABLE LINKS LOGIC
+// SHAREABLE LINKS LOGIC (Using Slugs)
 function checkSharedLink() {
     const urlParams = new URLSearchParams(window.location.search);
-    const examId = urlParams.get('exam');
-    if (examId) {
-        openExamPackages(examId);
+    const examSlug = urlParams.get('exam'); // Now reads ?exam=waec instead of ID
+    if (examSlug) {
+        const exam = dbExams.find(e => e.slug === examSlug);
+        if(exam) openExamPackages(exam._id);
     }
 }
 
-function shareExamLink(examId) {
-    const url = `${window.location.origin}${window.location.pathname}?exam=${examId}`;
+function shareExamLink(examSlug) {
+    const url = `${window.location.origin}${window.location.pathname}?exam=${examSlug}`;
     navigator.clipboard.writeText(url);
-    alert('Shareable link copied! You can send this to users to take them directly to this exam.');
+    alert('Shareable link copied: ' + url);
 }
 
 function openExamPackages(examId) {
@@ -112,7 +70,7 @@ function openExamPackages(examId) {
     if (!currentExam) return;
 
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
-    document.getElementById('share-link-btn').onclick = () => shareExamLink(examId);
+    document.getElementById('share-link-btn').onclick = () => shareExamLink(currentExam.slug);
     
     document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
     document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
@@ -125,6 +83,7 @@ function openExamPackages(examId) {
     showPage('packages');
 }
 
+// ... (Keep openCheckout, limitSubjects, payWithPaystack, generatePIN, verifyAndShowContent, enquiry form logic exactly as they are) ...
 function openCheckout(packageType) {
     currentPackageType = packageType;
     const previewArea = document.getElementById('preview-image-area');
