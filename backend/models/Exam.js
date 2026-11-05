@@ -16,7 +16,8 @@ const examSchema = new mongoose.Schema({
     subjects: [{
         name: String,
         content: String,
-        previewImage: String
+        // Changed to an array to hold multiple images
+        previewImages: [{ type: String }] 
     }]
 });
 
