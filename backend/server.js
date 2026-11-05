@@ -8,7 +8,14 @@ const Pin = require('./models/Pin');
 const Enquiry = require('./models/Enquiry');
 
 const app = express();
-app.use(cors());
+
+// Allow all origins (Required for Vercel to talk to Render)
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
