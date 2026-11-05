@@ -15,15 +15,20 @@
         .section.active { display: block; }
         input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
         button.save-btn { background: #001f5b; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .row { display: flex; gap: 15px; align-items: center; margin-bottom: 10px; }
+        button.save-btn:hover { background: #003399; }
+        .row { display: flex; gap: 15px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;}
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
         th { background: #001f5b; color: white; }
         .btn-reply { background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 400px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;}
+        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 400px; max-width: 90%; }
         
-        /* Gallery Styles */
+        /* Upload Sections Styling */
+        .upload-box { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; background: #fff; }
+        .upload-box h4 { margin: 0 0 10px 0; color: #001f5b; }
+        
+        /* Image Gallery Styles */
         .image-gallery { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
         .image-thumbnail { position: relative; width: 100px; height: 100px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; }
         .image-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
@@ -49,42 +54,55 @@
                 <option value="">-- Select Exam --</option>
             </select>
 
+            <!-- Exam Config (Prices) -->
             <div class="section" id="config-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom: 20px;">
                 <h3>Configure <span id="config-name"></span></h3>
-                <div class="row"><label>Per Subject (₦):</label> <input type="number" id="price-per-subject"> <input type="checkbox" id="allow-per-subject"> Enable</div>
-                <div class="row"><label>Per Dept (₦):</label> <input type="number" id="price-per-dept"> <input type="checkbox" id="allow-per-dept"> Enable</div>
-                <div class="row"><label>All Subjects (₦):</label> <input type="number" id="price-all-subjects"> <input type="checkbox" id="allow-all"> Enable</div>
+                <div class="row"><label style="width:120px;">Per Subject (₦):</label> <input type="number" id="price-per-subject"> <label><input type="checkbox" id="allow-per-subject"> Enable</label></div>
+                <div class="row"><label style="width:120px;">Per Dept (₦):</label> <input type="number" id="price-per-dept"> <label><input type="checkbox" id="allow-per-dept"> Enable</label></div>
+                <div class="row"><label style="width:120px;">All Subjects (₦):</label> <input type="number" id="price-all-subjects"> <label><input type="checkbox" id="allow-all"> Enable</label></div>
                 <button class="save-btn" onclick="saveConfig()">Save Prices</button>
             </div>
 
+            <!-- Exam Content Upload -->
             <div class="section" id="content-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px;">
                 <h3>Upload Content & Images</h3>
-                <label>Select Subject:</label> <select id="subject-select" onchange="loadSubjectData()"></select>
+                <label>Select Subject:</label> 
+                <select id="subject-select" onchange="loadSubjectData()"></select>
                 
-                <!-- Image Gallery Section -->
-                <label style="margin-top:10px; display:block;">Subject Thumbnails (Max 25):</label>
-                <div id="image-gallery" class="image-gallery">
-                    <!-- Thumbnails injected via JS -->
+                <!-- 1. SINGLE THUMBNAIL UPLOAD -->
+                <div class="upload-box">
+                    <h4>Public Thumbnail (1 Image)</h4>
+                    <div id="thumbnail-preview" style="margin-bottom:10px;"></div>
+                    <input type="file" id="thumbnail-upload" accept="image/*">
+                    <button class="save-btn" style="margin-top:5px; font-size:12px;" onclick="uploadThumbnail()">Upload Thumbnail</button>
                 </div>
 
-                <label>Upload Images (Max 5 at once):</label> 
-                <input type="file" id="image-upload" accept="image/*" multiple>
-                
-                <label style="margin-top:10px; display:block;">Answers:</label> 
-                <textarea id="content-input" rows="5"></textarea>
-                
-                <button class="save-btn" style="margin-top:10px;" onclick="saveSubjectData()">Save Subject</button>
+                <!-- 2. MULTIPLE Q&A IMAGES UPLOAD -->
+                <div class="upload-box">
+                    <h4>Private Q&A Images (Max 25 total)</h4>
+                    <div id="qa-gallery" class="image-gallery"></div>
+                    <input type="file" id="qa-upload" accept="image/*" multiple>
+                    <button class="save-btn" style="margin-top:5px; font-size:12px;" onclick="uploadQAImages()">Upload Q&A Images (Max 5 at once)</button>
+                </div>
+
+                <!-- 3. TEXT CONTENT -->
+                <div class="upload-box">
+                    <h4>Text Answers</h4>
+                    <textarea id="content-input" rows="5" placeholder="Paste text answers here..."></textarea>
+                    <button class="save-btn" onclick="saveTextContent()">Save Text Content</button>
+                </div>
             </div>
         </div>
 
-        <!-- PINS TAB (Unchanged) -->
+        <!-- PINS TAB -->
         <div id="tab-pins" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3>Generate Manual PIN</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Use this if a user lost their PIN. Ask them for their "Device ID" (visible on the Verify Page).</p>
                 <div class="row"><select id="manual-exam-select" onchange="loadManualSubjects()"></select></div>
-                <div class="row"><input type="text" id="manual-device-id" placeholder="Enter User's Device ID (Required)"></div>
+                <div class="row"><input type="text" id="manual-device-id" placeholder="Enter User's Device ID (e.g., DEV-ABC123)"></div>
                 <div class="row"><input type="text" id="manual-pin-input" placeholder="Enter Custom PIN (e.g. ABC123)"></div>
-                <div id="manual-subjects-area" style="max-height: 100px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:10px;"></div>
+                <div id="manual-subjects-area" style="max-height: 100px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:10px; background:#fff; border-radius:5px;"></div>
                 <button class="save-btn" onclick="generateManualPin()">Generate PIN</button>
             </div>
 
@@ -95,7 +113,7 @@
             </table>
         </div>
 
-        <!-- ENQUIRIES TAB (Unchanged) -->
+        <!-- ENQUIRIES TAB -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
@@ -111,18 +129,18 @@
             <h3>Reply to <span id="reply-name"></span></h3>
             <textarea id="reply-message" rows="4" placeholder="Type your reply..."></textarea>
             <button class="save-btn" onclick="sendEmailReply()" style="width:100%; margin-top:10px;">Send Email</button>
-            <button onclick="closeModal()" style="width:100%; margin-top:5px; background:#ccc; border:none; padding:10px; border-radius:5px;">Cancel</button>
+            <button onclick="closeModal()" style="width:100%; margin-top:5px; background:#ccc; border:none; padding:10px; border-radius:5px; cursor:pointer;">Cancel</button>
             <p id="email-status" style="color:green; font-weight:bold; margin-top:10px;"></p>
         </div>
     </div>
 
     <script>
-        // ⚠️ EMAILJS CONFIG
+        // ⚠️ EMAILJS CONFIG (Update these with your keys)
         emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
         const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
 
-        // ⚠️ BACKEND URL
+        // ⚠️ BACKEND URL (Update this with your Render URL)
         const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
         
         let exams = [];
@@ -135,6 +153,7 @@
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById('tab-' + tabId).classList.add('active');
+            
             if(tabId === 'enquiries') loadEnquiries();
             if(tabId === 'pins') loadPinHistory();
         }
@@ -144,15 +163,17 @@
                 const res = await fetch(`${API_URL}/exams`);
                 exams = await res.json();
                 
+                // Populate Exam Management Dropdown
                 const select = document.getElementById('exam-select');
                 select.innerHTML = '<option value="">-- Select Exam --</option>';
                 exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
 
+                // Populate Manual PIN Dropdown
                 const manualSelect = document.getElementById('manual-exam-select');
                 exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
                 loadManualSubjects();
 
-            } catch (e) { alert("Failed to connect to backend."); }
+            } catch (e) { alert("Failed to connect to backend. Check console for details."); }
         };
 
         // --- EXAM MANAGEMENT ---
@@ -177,37 +198,44 @@
             loadSubjectData();
         }
 
-        // Updated to load image gallery
         function loadSubjectData() {
             const subName = document.getElementById('subject-select').value;
             activeSubject = activeExam.subjects.find(s => s.name === subName);
             
             document.getElementById('content-input').value = activeSubject.content || '';
             
-            // Render Image Gallery
-            const gallery = document.getElementById('image-gallery');
+            // Render Thumbnail Preview
+            const thumbPreview = document.getElementById('thumbnail-preview');
+            if(activeSubject.thumbnail) {
+                thumbPreview.innerHTML = `<img src="${activeSubject.thumbnail}" style="width:100px; height:100px; object-fit:cover; border-radius:5px; border:1px solid #ccc;">`;
+            } else {
+                thumbPreview.innerHTML = `<p style="font-size:12px; color:#666;">No thumbnail uploaded.</p>`;
+            }
+
+            // Render QA Gallery
+            const gallery = document.getElementById('qa-gallery');
             gallery.innerHTML = '';
-            const images = activeSubject.previewImages || [];
+            const images = activeSubject.qaImages || [];
             
             if(images.length === 0) {
-                gallery.innerHTML = '<p style="font-size:12px; color:#666;">No images uploaded yet.</p>';
+                gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images uploaded yet.</p>';
             } else {
                 images.forEach((imgUrl, index) => {
                     gallery.innerHTML += `
                         <div class="image-thumbnail">
-                            <img src="${imgUrl}" alt="Preview">
-                            <button class="delete-img-btn" onclick="removeImage(${index})" title="Delete Image">×</button>
+                            <img src="${imgUrl}" alt="QA">
+                            <button class="delete-img-btn" onclick="removeQAImage(${index})" title="Delete Image">×</button>
                         </div>
                     `;
                 });
             }
         }
 
-        // Function to delete an image from the list
-        window.removeImage = function(index) {
+        // Delete a Q&A image from the local array
+        window.removeQAImage = function(index) {
             if(confirm('Delete this image?')) {
-                activeSubject.previewImages.splice(index, 1);
-                loadSubjectData(); // Re-render gallery
+                activeSubject.qaImages.splice(index, 1);
+                saveActiveSubjectToDB().then(() => loadSubjectData());
             }
         };
 
@@ -228,59 +256,63 @@
             alert('Prices Updated!');
         }
 
-        // Updated to handle multiple image uploads
-        async function saveSubjectData() {
-            const subName = document.getElementById('subject-select').value;
-            const content = document.getElementById('content-input').value;
-            const fileInput = document.getElementById('image-upload');
-            
-            // Check current number of images
-            let currentImages = activeSubject.previewImages || [];
-            if(currentImages.length >= 25) {
-                return alert('You have reached the maximum limit of 25 images for this subject.');
-            }
+        async function uploadThumbnail() {
+            const fileInput = document.getElementById('thumbnail-upload');
+            if (fileInput.files.length === 0) return alert('Select an image first.');
 
-            if (fileInput.files.length > 0) {
-                if (fileInput.files.length > 5) {
-                    return alert('You can only upload a maximum of 5 images at once.');
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+
+            try {
+                const res = await fetch(`${API_URL}/upload/thumbnail`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if(data.imageUrl) {
+                    activeSubject.thumbnail = data.imageUrl;
+                    await saveActiveSubjectToDB();
+                    alert('Thumbnail Uploaded!');
+                    fileInput.value = '';
+                    loadSubjectData();
                 }
+            } catch (e) { alert('Failed to upload thumbnail.'); }
+        }
 
-                const formData = new FormData();
-                for(let i = 0; i < fileInput.files.length; i++) {
-                    formData.append('images', fileInput.files[i]);
+        async function uploadQAImages() {
+            const fileInput = document.getElementById('qa-upload');
+            if (fileInput.files.length === 0) return alert('Select images first.');
+            if (fileInput.files.length > 5) return alert('You can only upload up to 5 images at once.');
+
+            let currentQA = activeSubject.qaImages || [];
+            if(currentQA.length + fileInput.files.length > 25) return alert('Max 25 Q&A images allowed per subject.');
+
+            const formData = new FormData();
+            for(let i=0; i<fileInput.files.length; i++) formData.append('images', fileInput.files[i]);
+
+            try {
+                const res = await fetch(`${API_URL}/upload/qa`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if(data.imageUrls) {
+                    activeSubject.qaImages = [...currentQA, ...data.imageUrls];
+                    await saveActiveSubjectToDB();
+                    alert('Q&A Images Uploaded!');
+                    fileInput.value = '';
+                    loadSubjectData();
                 }
+            } catch (e) { alert('Failed to upload Q&A images.'); }
+        }
 
-                try {
-                    const uploadRes = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
-                    const uploadData = await uploadRes.json();
-                    
-                    if(uploadData.imageUrls) {
-                        // Append new images to existing ones
-                        currentImages = [...currentImages, ...uploadData.imageUrls];
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert('Failed to upload images.');
-                    return;
-                }
-            }
+        async function saveTextContent() {
+            activeSubject.content = document.getElementById('content-input').value;
+            await saveActiveSubjectToDB();
+            alert('Text Answers Saved!');
+        }
 
-            const updatedSubjects = activeExam.subjects.map(sub => {
-                if(sub.name === subName) {
-                    return { ...sub, content: content, previewImages: currentImages };
-                }
-                return sub;
-            });
-
+        async function saveActiveSubjectToDB() {
+            const updatedSubjects = activeExam.subjects.map(sub => sub.name === activeSubject.name ? activeSubject : sub);
             await fetch(`${API_URL}/exams/${activeExam._id}`, { 
                 method: 'PUT', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ subjects: updatedSubjects }) 
             });
-            
-            alert('Subject Data Saved!');
-            fileInput.value = ''; // Clear input
-            loadSubjectData(); // Refresh gallery
         }
 
         // --- PIN MANAGEMENT ---
@@ -309,7 +341,7 @@
             area.innerHTML = '';
             if(!exam) return;
             exam.subjects.forEach(sub => {
-                area.innerHTML += `<label style="display:block;"><input type="checkbox" name="manual-sub" value="${sub.name}"> ${sub.name}</label>`;
+                area.innerHTML += `<label style="display:block; margin-bottom:5px;"><input type="checkbox" name="manual-sub" value="${sub.name}"> ${sub.name}</label>`;
             });
         }
 
@@ -320,9 +352,9 @@
             const checked = document.querySelectorAll('input[name="manual-sub"]:checked');
             const subjects = Array.from(checked).map(cb => cb.value);
 
-            if(!deviceId) return alert('Device ID is required.');
+            if(!deviceId) return alert('Device ID is required so the user can access it.');
             if(subjects.length === 0) return alert('Select at least one subject.');
-            if(!customPin) return alert('Enter a custom PIN.');
+            if(!customPin) return alert('Enter a custom PIN (e.g., ABC123).');
 
             try {
                 const res = await fetch(`${API_URL}/pins`, {
@@ -333,7 +365,7 @@
                 const data = await res.json();
                 if(data.success) {
                     alert(`PIN Generated Successfully: ${data.pin}`);
-                    loadPinHistory();
+                    loadPinHistory(); // Refresh table
                 } else {
                     alert(data.error);
                 }
