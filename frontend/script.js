@@ -1,4 +1,4 @@
-const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // ⚠️ REPLACE THIS
+const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
 
 let dbExams = [];
 let currentExam = null;
@@ -14,10 +14,17 @@ function getDeviceId() {
     return deviceId;
 }
 
-// Show Device ID to user so they can send it to admin if they lose PIN
 function displayDeviceId() {
     const display = document.getElementById('user-device-id-display');
-    if(display) display.innerText = getDeviceId();
+    if(display) {
+        display.innerText = getDeviceId();
+    }
+}
+
+function copyDeviceId() {
+    const deviceId = getDeviceId();
+    navigator.clipboard.writeText(deviceId);
+    alert('Device ID Copied! Send this to Support on Telegram if you need help recovering a PIN.');
 }
 
 function showPage(pageId) {
@@ -49,10 +56,9 @@ function renderExams() {
     });
 }
 
-// SHAREABLE LINKS LOGIC (Using Slugs)
 function checkSharedLink() {
     const urlParams = new URLSearchParams(window.location.search);
-    const examSlug = urlParams.get('exam'); // Now reads ?exam=waec instead of ID
+    const examSlug = urlParams.get('exam');
     if (examSlug) {
         const exam = dbExams.find(e => e.slug === examSlug);
         if(exam) openExamPackages(exam._id);
@@ -83,7 +89,6 @@ function openExamPackages(examId) {
     showPage('packages');
 }
 
-// ... (Keep openCheckout, limitSubjects, payWithPaystack, generatePIN, verifyAndShowContent, enquiry form logic exactly as they are) ...
 function openCheckout(packageType) {
     currentPackageType = packageType;
     const previewArea = document.getElementById('preview-image-area');
@@ -119,18 +124,9 @@ function openCheckout(packageType) {
 function updatePreviewAndLimit(checkbox, max) {
     const checked = document.querySelectorAll('input[name="subject"]:checked');
     if (checked.length > max) { checkbox.checked = false; return; }
-    
-    const previewContainer = document.getElementById('subject-preview-img'); // Note: This is an img tag in HTML
-    
     if (checkbox.checked) {
         const subData = currentExam.subjects.find(s => s.name === checkbox.value);
-        
-        // Logic to show the first image as the main thumbnail
-        if (subData.previewImages && subData.previewImages.length > 0) {
-            previewContainer.src = subData.previewImages[0];
-        } else {
-            previewContainer.src = 'https://via.placeholder.com/300x150?text=No+Preview+Uploaded';
-        }
+        document.getElementById('subject-preview-img').src = subData.thumbnail || 'https://via.placeholder.com/300x150?text=No+Preview';
     }
 }
 
@@ -149,7 +145,7 @@ function payWithPaystack() {
     }
 
     let handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -168,14 +164,6 @@ async function generatePIN(selectedSubjects) {
         });
         const data = await response.json();
         if (data.success) {
-            // Save to local history
-            savePinLocally({ 
-                pin: data.pin, 
-                examId: currentExam._id, 
-                subjects: subjectNames, 
-                date: new Date().toISOString() 
-            });
-
             document.getElementById('generated-pin').innerText = data.pin;
             document.getElementById('success-modal').style.display = 'flex';
         }
@@ -196,12 +184,29 @@ async function verifyAndShowContent() {
 
         errorMsg.style.display = 'none';
         document.getElementById('content-display').style.display = 'block';
+        const examInfo = dbExams.find(e => e._id === result.data.examId);
         let contentText = "";
         result.data.subjects.forEach(subName => {
-            const subjectData = result.data.examId.subjects.find(s => s.name === subName);
-            if (subjectData) contentText += `--- ${subjectData.name.toUpperCase()} ---\n${subjectData.content || 'No content yet'}\n\n`;
+            const subjectData = examInfo.subjects.find(s => s.name === subName);
+            if (subjectData) contentText += `--- ${subjectData.name.toUpperCase()} ---\n${subjectData.content || 'No text content yet'}\n\n`;
         });
         document.getElementById('actual-answers').innerText = contentText;
+        
+        // Display images if any exist
+        const answersDiv = document.getElementById('actual-answers');
+        answersDiv.innerHTML = `<pre style="font-family:monospace; white-space:pre-wrap;">${contentText}</pre>`;
+        
+        result.data.subjects.forEach(subName => {
+            const subjectData = examInfo.subjects.find(s => s.name === subName);
+            if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
+                answersDiv.innerHTML += `<h4 style="margin-top:15px; color:var(--primary-blue);">${subName} Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">`;
+                subjectData.qaImages.forEach(imgUrl => {
+                    answersDiv.innerHTML += `<img src="${imgUrl}" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">`;
+                });
+                answersDiv.innerHTML += `</div>`;
+            }
+        });
+
     } catch (error) { errorMsg.innerText = 'Connection error.'; errorMsg.style.display = 'block'; }
 }
 
