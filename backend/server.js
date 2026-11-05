@@ -9,7 +9,12 @@ const Pin = require('./models/Pin');
 const Enquiry = require('./models/Enquiry');
 
 const app = express();
-app.use(cors());
+// Allow your Vercel frontend and localhost to connect
+app.use(cors({
+    origin: ['https://success-academy-afri.vercel.app', 'http://localhost:3000', 'http://127.0.0.1:5500'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+}));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
