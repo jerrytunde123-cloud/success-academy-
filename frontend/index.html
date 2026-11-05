@@ -21,8 +21,8 @@
         <nav>
             <ul>
                 <li><a href="#" onclick="showPage('home')">Home</a></li>
-                <li><a href="#exams">Exams</a></li>
-                <li><a href="#" onclick="showPage('verify')">View Purchased PIN</a></li>
+                <li><a href="#" onclick="showPage('history')">My PINs</a></li>
+                <li><a href="#" onclick="showPage('verify')">View Content</a></li>
             </ul>
         </nav>
     </header>
@@ -40,8 +40,6 @@
 
         <section id="contact" class="contact-section">
             <h2 class="section-title text-yellow">Contact Us Today</h2>
-            <p style="text-align: center; color: white; margin-bottom: 20px;">Let's build your future together! Serving Students Across Nigeria and West Africa.</p>
-            
             <div class="contact-info">
                 <div class="phone-number"><i class="fas fa-phone-alt"></i> +234 704 813 5078</div>
                 <div class="social-links">
@@ -49,7 +47,6 @@
                     <a href="https://t.me/Officialkingjay1" class="social-btn tg-btn" target="_blank"><i class="fab fa-telegram"></i> Telegram</a>
                 </div>
             </div>
-
             <form class="contact-form" id="enquiryForm">
                 <h3>Send an Enquiry</h3>
                 <input type="text" id="name" placeholder="Your Full Name" required>
@@ -69,7 +66,10 @@
     </main>
 
     <main id="page-packages" style="display: none; padding: 40px 5%;">
-        <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back to Exams</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
+            <button id="share-link-btn" class="btn-buy" style="width:auto; padding:10px 15px; background:#0088cc;"><i class="fas fa-link"></i> Copy Share Link</button>
+        </div>
         <h2 class="section-title" id="pkg-exam-title"></h2>
         <div class="packages-container">
             <div class="package-card" id="pkg-per-subject">
@@ -90,6 +90,12 @@
         </div>
     </main>
 
+    <main id="page-history" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
+        <h2 class="section-title">My Purchased PINs</h2>
+        <p style="text-align:center; margin-bottom:20px; color:#666;">These are the PINs you have purchased on this specific device. Click "Copy PIN" to use them.</p>
+        <div id="pin-history-container"></div>
+    </main>
+
     <main id="page-verify" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <div class="verify-box">
             <h2>Enter Your PIN to View Answers</h2>
@@ -103,6 +109,7 @@
         </div>
     </main>
 
+    <!-- CHECKOUT MODAL -->
     <div id="checkout-modal" class="modal">
         <div class="modal-content">
             <h3>Checkout: <span id="checkout-title"></span></h3>
@@ -114,7 +121,13 @@
                 <div id="subject-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;"></div>
             </div>
             <button class="btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button>
-            <button class="btn-cancel" onclick="closeModal('checkout-modal')">Cancel</button>
+            
+            <div style="text-align:center; margin-top:15px;">
+                <p style="font-size:14px; color:#666; margin-bottom:5px;">Having payment issues?</p>
+                <a href="https://t.me/Officialkingjay1" target="_blank" style="background:#0088cc; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block;"><i class="fab fa-telegram"></i> Contact Support on Telegram</a>
+            </div>
+
+            <button class="btn-cancel" onclick="closeModal('checkout-modal')" style="margin-top: 15px;">Cancel</button>
         </div>
     </div>
 
@@ -123,6 +136,7 @@
             <h3 style="color: green;">Payment Successful!</h3>
             <p>Your unique PIN is:</p>
             <h1 id="generated-pin" style="letter-spacing: 5px; color: var(--primary-blue);"></h1>
+            <p style="font-size:13px; color:#666; margin-bottom:15px;">Save this PIN! You can view it later in the "My PINs" tab.</p>
             <button class="btn-buy" onclick="closeModal('success-modal'); showPage('verify');">View Answers Now</button>
         </div>
     </div>
