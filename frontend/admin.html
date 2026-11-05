@@ -8,7 +8,7 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .header { display: flex; justify-content: space-between; border-bottom: 2px solid #001f5b; padding-bottom: 15px; margin-bottom: 20px; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .tab { padding: 10px 20px; background: #ddd; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; }
         .tab.active { background: #001f5b; color: white; }
         .section { display: none; }
@@ -17,7 +17,7 @@
         button.save-btn { background: #001f5b; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .row { display: flex; gap: 15px; align-items: center; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
         th { background: #001f5b; color: white; }
         .btn-reply { background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
@@ -32,10 +32,12 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('exams')">Manage Exams</button>
-            <button class="tab" onclick="switchTab('enquiries')">View Enquiries</button>
+            <button class="tab active" onclick="switchTab('exams', event)">Manage Exams</button>
+            <button class="tab" onclick="switchTab('pins', event)">PIN History</button>
+            <button class="tab" onclick="switchTab('enquiries', event)">Enquiries</button>
         </div>
 
+        <!-- EXAMS TAB -->
         <div id="tab-exams" class="section active">
             <select id="exam-select" onchange="loadExamConfig()">
                 <option value="">-- Select Exam --</option>
@@ -59,6 +61,33 @@
             </div>
         </div>
 
+        <!-- PINS TAB -->
+        <div id="tab-pins" class="section">
+            <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <h3>Generate Manual PIN</h3>
+                <div class="row">
+                    <select id="manual-exam-select" onchange="loadManualSubjects()"></select>
+                </div>
+                <div class="row">
+                    <input type="text" id="manual-device-id" placeholder="Enter User's Device ID (Required)">
+                </div>
+                <div class="row">
+                    <input type="text" id="manual-pin-input" placeholder="Enter Custom PIN (e.g. ABC123)">
+                </div>
+                <div id="manual-subjects-area" style="max-height: 100px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:10px;">
+                    <!-- Checkboxes -->
+                </div>
+                <button class="save-btn" onclick="generateManualPin()">Generate PIN</button>
+            </div>
+
+            <h3>All Purchased PINs</h3>
+            <table>
+                <thead><tr><th>Date</th><th>Exam</th><th>PIN</th><th>Device ID</th><th>Subjects</th></tr></thead>
+                <tbody id="pins-table-body"></tbody>
+            </table>
+        </div>
+
+        <!-- ENQUIRIES TAB -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
@@ -79,36 +108,47 @@
     </div>
 
     <script>
-        // ⚠️ SETUP EMAILJS HERE ⚠️
-        emailjs.init("oFtTHwtJcNPqUoEL0"); 
-        const EMAILJS_SERVICE_ID = "service_6pynucv"; 
-        const EMAILJS_TEMPLATE_ID = "template_w2ee2uu";
+        // ⚠️ EMAILJS CONFIG
+        emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
+        const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
+        const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
 
-        // ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL ⚠️
-        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
+        // ⚠️ BACKEND URL
+        const API_URL = 'https://success-academy-backend.onrender.com/api'; 
         
         let exams = [];
         let activeExam = null;
         let currentReplyData = null;
 
-        function switchTab(tabId) {
+        function switchTab(tabId, event) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById('tab-' + tabId).classList.add('active');
+            
             if(tabId === 'enquiries') loadEnquiries();
+            if(tabId === 'pins') loadPinHistory();
         }
 
         window.onload = async () => {
             try {
                 const res = await fetch(`${API_URL}/exams`);
                 exams = await res.json();
+                
+                // Populate Main Dropdown
                 const select = document.getElementById('exam-select');
                 select.innerHTML = '<option value="">-- Select Exam --</option>';
                 exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
+
+                // Populate Manual PIN Dropdown
+                const manualSelect = document.getElementById('manual-exam-select');
+                exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
+                loadManualSubjects();
+
             } catch (e) { alert("Failed to connect to backend."); }
         };
 
+        // --- EXAM MANAGEMENT ---
         function loadExamConfig() {
             const id = document.getElementById('exam-select').value;
             if(!id) return;
@@ -176,6 +216,66 @@
             document.getElementById('image-upload').value = '';
         }
 
+        // --- PIN MANAGEMENT ---
+        async function loadPinHistory() {
+            const res = await fetch(`${API_URL}/admin/pins`);
+            const pins = await res.json();
+            const tbody = document.getElementById('pins-table-body');
+            tbody.innerHTML = '';
+            
+            pins.forEach(p => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${new Date(p.date).toLocaleDateString()}</td>
+                        <td>${p.examId ? p.examId.name : 'Deleted Exam'}</td>
+                        <td style="font-weight:bold; color:green;">${p.pin}</td>
+                        <td><code>${p.deviceId}</code></td>
+                        <td>${p.subjects.join(', ')}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function loadManualSubjects() {
+            const examId = document.getElementById('manual-exam-select').value;
+            const exam = exams.find(e => e._id === examId);
+            const area = document.getElementById('manual-subjects-area');
+            area.innerHTML = '';
+            if(!exam) return;
+            exam.subjects.forEach(sub => {
+                area.innerHTML += `<label style="display:block;"><input type="checkbox" name="manual-sub" value="${sub.name}"> ${sub.name}</label>`;
+            });
+        }
+
+        async function generateManualPin() {
+            const examId = document.getElementById('manual-exam-select').value;
+            const deviceId = document.getElementById('manual-device-id').value.trim().toUpperCase();
+            const customPin = document.getElementById('manual-pin-input').value.trim();
+            
+            const checked = document.querySelectorAll('input[name="manual-sub"]:checked');
+            const subjects = Array.from(checked).map(cb => cb.value);
+
+            if(!deviceId) return alert('Device ID is required so the user can access it.');
+            if(subjects.length === 0) return alert('Select at least one subject.');
+            if(!customPin) return alert('Enter a custom PIN (e.g., ABC123).');
+
+            try {
+                const res = await fetch(`${API_URL}/pins`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ examId, subjects, deviceId, manualPin: customPin })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    alert(`PIN Generated Successfully: ${data.pin}`);
+                    loadPinHistory(); // Refresh table
+                } else {
+                    alert(data.error);
+                }
+            } catch (e) { alert('Error generating PIN.'); }
+        }
+
+        // --- ENQUIRIES ---
         async function loadEnquiries() {
             const res = await fetch(`${API_URL}/enquiries`);
             const enquiries = await res.json();
