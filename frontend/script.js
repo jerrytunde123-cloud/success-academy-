@@ -1,4 +1,4 @@
-const API_URL = 'https://success-academy-backend-mh1o.onrender.com/'; // CHANGE THIS TO YOUR LIVE BACKEND URL LATER
+const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // CHANGE THIS TO YOUR LIVE BACKEND URL LATER
 let dbExams = [];
 let currentExam = null;
 let currentPackageType = null;
