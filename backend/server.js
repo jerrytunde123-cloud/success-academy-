@@ -12,14 +12,15 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Wjh7YkO58X901Q9p>@cluster.f4jypw9.mongodb.net/';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Wjh7YkO58X901Q9p>@cluster.f4jypw9.mongodb.net/
+';
 
 mongoose.connect(MONGO_URI)
 .then(async () => {
     console.log('MongoDB Connected');
     const count = await Exam.countDocuments();
     if (count === 0) {
-        const defaultSubjects = ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', previewImage: '' }));
+        const defaultSubjects = ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', previewImages: [] }));
         await Exam.insertMany([
             { name: 'WAEC', logo: 'waec-logo.png', subjects: defaultSubjects },
             { name: 'WAEC GCE', logo: 'waec-logo.png', subjects: defaultSubjects },
@@ -38,9 +39,11 @@ mongoose.connect(MONGO_URI)
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => { cb(null, 'uploads/'); },
-    filename: (req, file, cb) => { cb(null, Date.now() + path.extname(file.originalname)); }
+    filename: (req, file, cb) => { cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname)); }
 });
-const upload = multer({ storage });
+
+// Allow up to 5 files per upload
+const upload = multer({ storage, limits: { files: 5 } });
 
 // --- ROUTES ---
 app.get('/api/exams', async (req, res) => {
@@ -51,20 +54,20 @@ app.put('/api/exams/:id', async (req, res) => {
     try { res.json(await Exam.findByIdAndUpdate(req.params.id, req.body, { new: true })); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/upload', upload.single('image'), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+// UPDATED: Upload Multiple Images
+app.post('/api/upload', upload.array('images', 5), (req, res) => {
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+    
     const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-    res.json({ imageUrl: `${baseUrl}/uploads/${req.file.filename}` });
+    const imageUrls = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
+    
+    res.json({ imageUrls });
 });
 
-// UPDATED: Generate PIN (Now handles manual PINs from Admin)
 app.post('/api/pins', async (req, res) => {
     try {
         const { examId, subjects, deviceId, manualPin } = req.body;
-        
-        // If manualPin is provided by admin, use it. Otherwise generate random.
         const finalPin = manualPin ? manualPin.toUpperCase() : Math.random().toString(36).substr(2, 6).toUpperCase();
-        
         const newPin = new Pin({ pin: finalPin, examId, subjects, deviceId });
         await newPin.save();
         res.json({ success: true, pin: finalPin });
@@ -84,7 +87,6 @@ app.post('/api/pins/verify', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NEW: Get All Pins for Admin
 app.get('/api/admin/pins', async (req, res) => {
     try { res.json(await Pin.find().populate('examId').sort({ date: -1 })); } catch (err) { res.status(500).json({ error: err.message }); }
 });
