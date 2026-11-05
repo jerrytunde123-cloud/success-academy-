@@ -9,23 +9,18 @@ const Enquiry = require('./models/Enquiry');
 
 const app = express();
 
-// Allow all origins (Required for Vercel to talk to Render)
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+// Allow Vercel to talk to Render
+app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// ⚠️ PUT YOUR MONGODB CONNECTION STRING HERE ⚠️
-const MONGO_URI = 'mongodb+srv://jerrytunde123_db_user:<Jerry/2007>@cluster.f4jypw9.mongodb.net/success_academy?retryWrites=true&w=majority';
+// Use Environment Variable for MongoDB (Better for Render)
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Jerry/2007>@cluster.f4jypw9.mongodb.net/success_academy?retryWrites=true&w=majority';
 
 mongoose.connect(MONGO_URI)
 .then(async () => {
     console.log('MongoDB Connected');
-    // Auto-seed database if empty
+    // Auto-seed database if empty (This fixes the missing exams)
     const count = await Exam.countDocuments();
     if (count === 0) {
         const defaultSubjects = ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', previewImage: '' }));
@@ -43,7 +38,7 @@ mongoose.connect(MONGO_URI)
         console.log('Database seeded with default exams.');
     }
 })
-.catch(err => console.log(err));
+.catch(err => console.log('MongoDB Connection Error:', err));
 
 // --- MULTER SETUP (For Image Uploads) ---
 const storage = multer.diskStorage({
@@ -53,7 +48,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // --- API ROUTES ---
-
 app.get('/api/exams', async (req, res) => {
     try {
         const exams = await Exam.find();
@@ -70,8 +64,9 @@ app.put('/api/exams/:id', async (req, res) => {
 
 app.post('/api/upload', upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    // Return the URL of the uploaded image (Change localhost to your live backend URL when deployed)
-    res.json({ imageUrl: `http://localhost:5000/uploads/${req.file.filename}` });
+    // Replace localhost with your live Render URL
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+    res.json({ imageUrl: `${baseUrl}/uploads/${req.file.filename}` });
 });
 
 app.post('/api/pins', async (req, res) => {
@@ -94,7 +89,6 @@ app.post('/api/pins/verify', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ENQUIRY ROUTES ---
 app.post('/api/enquiries', async (req, res) => {
     try {
         const newEnquiry = new Enquiry(req.body);
@@ -107,13 +101,6 @@ app.get('/api/enquiries', async (req, res) => {
     try {
         const enquiries = await Enquiry.find().sort({ date: -1 });
         res.json(enquiries);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.delete('/api/enquiries/:id', async (req, res) => {
-    try {
-        await Enquiry.findByIdAndDelete(req.params.id);
-        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
