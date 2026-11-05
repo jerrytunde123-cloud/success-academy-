@@ -1,4 +1,5 @@
-const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
+// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
+const API_URL = 'https://success-academy-backend-mh1o.onrender.com/'; 
 
 let dbExams = [];
 let currentExam = null;
@@ -16,9 +17,7 @@ function getDeviceId() {
 
 function displayDeviceId() {
     const display = document.getElementById('user-device-id-display');
-    if(display) {
-        display.innerText = getDeviceId();
-    }
+    if(display) display.innerText = getDeviceId();
 }
 
 function copyDeviceId() {
@@ -31,11 +30,13 @@ function showPage(pageId) {
     document.querySelectorAll('main').forEach(main => main.style.display = 'none');
     document.getElementById('page-' + pageId).style.display = 'block';
     if(pageId === 'verify') displayDeviceId();
+    if(pageId === 'home') fetchExams(); // Refresh data when returning to home
 }
 
 async function fetchExams() {
     try {
-        const response = await fetch(`${API_URL}/exams`);
+        // ⚠️ FORCE NO-CACHE: This ensures admin changes appear immediately
+        const response = await fetch(`${API_URL}/exams`, { cache: "no-store" });
         dbExams = await response.json();
         renderExams();
         checkSharedLink(); 
@@ -145,7 +146,8 @@ function payWithPaystack() {
     }
 
     let handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043
+', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -174,32 +176,29 @@ async function verifyAndShowContent() {
     const inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     const errorMsg = document.getElementById('pin-error');
     
-    // Reset UI
     errorMsg.style.display = 'none';
     document.getElementById('content-display').style.display = 'none';
 
     if(!inputPin) return alert("Please enter a PIN.");
 
     try {
+        // Force no-cache here too
         const response = await fetch(`${API_URL}/pins/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            cache: "no-store",
             body: JSON.stringify({ pin: inputPin, deviceId: getDeviceId() })
         });
         
         const result = await response.json();
         
-        // If the backend says 404 (Invalid) or 403 (Wrong Device), show that error
         if (!response.ok) { 
             errorMsg.innerText = result.error || 'Invalid PIN'; 
             errorMsg.style.display = 'block'; 
             return; 
         }
 
-        // Success!
         document.getElementById('content-display').style.display = 'block';
-        
-        // Find the exam details
         const examInfo = dbExams.find(e => e._id === result.data.examId._id);
         let contentText = "";
         
@@ -215,7 +214,6 @@ async function verifyAndShowContent() {
         const answersDiv = document.getElementById('actual-answers');
         answersDiv.innerHTML = `<pre style="font-family:monospace; white-space:pre-wrap;">${contentText}</pre>`;
         
-        // Append Images
         if (result.data.subjects) {
             result.data.subjects.forEach(subName => {
                 const subjectData = examInfo.subjects.find(s => s.name === subName);
