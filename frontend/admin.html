@@ -138,11 +138,11 @@
     </div>
 
     <script>
-        // ⚠️ ALL CONFIGURATIONS MOVED TO THE TOP TO PREVENT ERRORS
+        // ⚠️ CONFIGURATIONS MUST BE AT THE TOP
         const ADMIN_PASSWORD = "admin123"; 
-        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // Replace with your Render URL if different
+        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // Replace with your Render URL
         
-        // EMAILJS CONFIG
+        // ⚠️ EMAILJS CONFIG (Update with your keys)
         emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
         const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
@@ -152,12 +152,14 @@
         let activeSubject = null;
         let currentReplyData = null;
 
-        // Check if already logged in
-        if(localStorage.getItem('sa_admin_logged_in') === 'true') {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'block';
-            initDashboard();
-        }
+        // Initialize after the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            if(localStorage.getItem('sa_admin_logged_in') === 'true') {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                initDashboard();
+            }
+        });
 
         function checkPassword() {
             const input = document.getElementById('admin-password').value;
