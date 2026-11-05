@@ -160,9 +160,18 @@ function openCheckout(packageType) {
 function updatePreviewAndLimit(checkbox, max) {
     const checked = document.querySelectorAll('input[name="subject"]:checked');
     if (checked.length > max) { checkbox.checked = false; return; }
+    
+    const previewContainer = document.getElementById('subject-preview-img'); // Note: This is an img tag in HTML
+    
     if (checkbox.checked) {
         const subData = currentExam.subjects.find(s => s.name === checkbox.value);
-        document.getElementById('subject-preview-img').src = subData.previewImage || 'https://via.placeholder.com/300x150?text=No+Preview';
+        
+        // Logic to show the first image as the main thumbnail
+        if (subData.previewImages && subData.previewImages.length > 0) {
+            previewContainer.src = subData.previewImages[0];
+        } else {
+            previewContainer.src = 'https://via.placeholder.com/300x150?text=No+Preview+Uploaded';
+        }
     }
 }
 
