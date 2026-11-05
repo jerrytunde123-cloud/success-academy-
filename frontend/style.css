@@ -1,0 +1,223 @@
+// --- DATABASE SETUP ---
+let db = {
+    exams: JSON.parse(localStorage.getItem('sa_exams')),
+    content: JSON.parse(localStorage.getItem('sa_content')),
+    pins: JSON.parse(localStorage.getItem('sa_pins')) || {},
+    paystackKey: 'pk_test_YOUR_PAYSTACK_PUBLIC_KEY_HERE' // <-- PUT YOUR REAL KEY HERE
+};
+
+// Default Data Setup (Runs if LocalStorage is empty)
+if (!db.exams) {
+    db.exams = [
+        { id: 'waec', name: 'WAEC', logo: 'waec-logo.png', prices: { per_subject: 1000, per_dept: 5000, all_subjects: 8000 }, allow_per_subject: true, allow_per_dept: true, allow_all: true, subjects: ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'], images: {} },
+        { id: 'jamb', name: 'JAMB', logo: 'jamb-logo.png', prices: { per_subject: 500, per_dept: 2000, all_subjects: 4000 }, allow_per_subject: true, allow_per_dept: true, allow_all: true, subjects: ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'], images: {} },
+        { id: 'neco', name: 'NECO', logo: 'neco-logo.png', prices: { per_subject: 800, per_dept: 4000, all_subjects: 7000 }, allow_per_subject: true, allow_per_dept: true, allow_all: true, subjects: ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'], images: {} }
+    ];
+    localStorage.setItem('sa_exams', JSON.stringify(db.exams));
+}
+
+if (!db.content) {
+    db.content = { 'waec': { 'Maths': '1. A 2. B 3. C... (WAEC Maths Answers)' } };
+    localStorage.setItem('sa_content', JSON.stringify(db.content));
+}
+
+function getDeviceId() {
+    let deviceId = localStorage.getItem('sa_device_id');
+    if (!deviceId) {
+        deviceId = 'DEV-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+        localStorage.setItem('sa_device_id', deviceId);
+    }
+    return deviceId;
+}
+
+function showPage(pageId) {
+    document.querySelectorAll('main').forEach(main => main.style.display = 'none');
+    document.getElementById('page-' + pageId).style.display = 'block';
+    if(pageId === 'home') {
+        document.getElementById('page-view-content').style.display = 'none';
+    }
+}
+
+function renderExams() {
+    const grid = document.getElementById('home-exam-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    db.exams.forEach(exam => {
+        const card = document.createElement('div');
+        card.className = 'exam-card';
+        card.onclick = () => openExamPackages(exam.id);
+        const fallbackImg = 'https://via.placeholder.com/60/001f5b/ffcc00?text=' + exam.name.substring(0,2);
+        card.innerHTML = `<img src="${exam.logo}" onerror="this.src='${fallbackImg}'"><h3 style="margin-top:10px; color:var(--primary-blue);">${exam.name}</h3>`;
+        grid.appendChild(card);
+    });
+}
+
+let currentExam = null;
+let currentPackageType = null;
+let currentPrice = 0;
+
+function openExamPackages(examId) {
+    currentExam = db.exams.find(e => e.id === examId);
+    if (!currentExam) return;
+
+    document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
+    document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
+    document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
+    document.getElementById('price-all-subjects').innerText = currentExam.prices.all_subjects;
+
+    document.getElementById('pkg-per-subject').style.display = currentExam.allow_per_subject ? 'block' : 'none';
+    document.getElementById('pkg-per-dept').style.display = currentExam.allow_per_dept ? 'block' : 'none';
+    document.getElementById('pkg-all-subjects').style.display = currentExam.allow_all ? 'block' : 'none';
+
+    showPage('packages');
+}
+
+function openCheckout(packageType) {
+    currentPackageType = packageType;
+    const checkoutTitle = document.getElementById('checkout-title');
+    const checkoutAmount = document.getElementById('checkout-amount');
+    const subjectArea = document.getElementById('subject-selection-area');
+    const subjectCheckboxes = document.getElementById('subject-checkboxes');
+    const previewArea = document.getElementById('preview-image-area');
+    const previewImg = document.getElementById('subject-preview-img');
+
+    checkoutTitle.innerText = currentExam.name + ' - ' + packageType.replace(/_/g, ' ');
+    
+    if (packageType === 'per_subject') {
+        currentPrice = currentExam.prices.per_subject;
+        subjectArea.style.display = 'block';
+        previewArea.style.display = 'block';
+        previewImg.src = 'https://via.placeholder.com/300x150?text=Select+a+Subject+to+Preview';
+        
+        subjectCheckboxes.innerHTML = currentExam.subjects.map(sub => `
+            <label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="${sub}" onchange="updatePreviewAndLimit(this, 1)"> ${sub}</label>
+        `).join('');
+    } else if (packageType === 'per_dept') {
+        currentPrice = currentExam.prices.per_dept;
+        subjectArea.style.display = 'block';
+        previewArea.style.display = 'none';
+        const maxSubs = (currentExam.id === 'jamb' || currentExam.id === 'jupeb' || currentExam.id === 'ijmb') ? 4 : 9;
+        subjectCheckboxes.innerHTML = currentExam.subjects.map(sub => `
+            <label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="${sub}" onchange="limitSubjects(this, ${maxSubs})"> ${sub}</label>
+        `).join('');
+    } else {
+        currentPrice = currentExam.prices.all_subjects;
+        subjectArea.style.display = 'none';
+        previewArea.style.display = 'none';
+    }
+
+    checkoutAmount.innerText = '₦' + currentPrice;
+    document.getElementById('checkout-modal').style.display = 'flex';
+}
+
+function updatePreviewAndLimit(checkbox, max) {
+    const checked = document.querySelectorAll('input[name="subject"]:checked');
+    if (checked.length > max) {
+        checkbox.checked = false;
+        return;
+    }
+    
+    if (checkbox.checked && currentExam.images && currentExam.images[checkbox.value]) {
+        document.getElementById('subject-preview-img').src = currentExam.images[checkbox.value];
+    } else if (checkbox.checked) {
+        document.getElementById('subject-preview-img').src = 'https://via.placeholder.com/300x150?text=No+Image+Uploaded+Yet';
+    }
+}
+
+function limitSubjects(checkbox, max) {
+    const checked = document.querySelectorAll('input[name="subject"]:checked');
+    if (checked.length > max) {
+        checkbox.checked = false;
+        alert('You can only select up to ' + max + ' subjects.');
+    }
+}
+
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+function payWithPaystack() {
+    let selectedSubjects = [];
+    if (currentPackageType !== 'all_subjects') {
+        const checked = document.querySelectorAll('input[name="subject"]:checked');
+        checked.forEach(cb => selectedSubjects.push(cb.value));
+        if (selectedSubjects.length === 0) {
+            alert('Please select at least one subject.');
+            return;
+        }
+    }
+
+    let handler = PaystackPop.setup({
+        key: db.paystackKey, 
+        email: "student@example.com", 
+        amount: currentPrice * 100, 
+        currency: "NGN",
+        ref: 'SA_' + Math.floor((Math.random() * 1000000000) + 1),
+        callback: function(response) {
+            generatePIN(selectedSubjects);
+        },
+        onClose: function() {
+            alert('Payment window closed.');
+        }
+    });
+    handler.openIframe(); 
+    // generatePIN(selectedSubjects); // <--- UNCOMMENT TO TEST WITHOUT REAL PAYMENT
+}
+
+function generatePIN(selectedSubjects) {
+    closeModal('checkout-modal');
+    const pin = Math.random().toString(36).substr(2, 6).toUpperCase();
+    
+    db.pins[pin] = {
+        examId: currentExam.id,
+        subjects: currentPackageType === 'all_subjects' ? currentExam.subjects : selectedSubjects,
+        deviceId: getDeviceId(),
+        date: new Date().toISOString()
+    };
+    localStorage.setItem('sa_pins', JSON.stringify(db.pins));
+
+    document.getElementById('generated-pin').innerText = pin;
+    document.getElementById('success-modal').style.display = 'flex';
+}
+
+function verifyAndShowContent() {
+    const inputPin = document.getElementById('user-pin-input').value.toUpperCase();
+    const pinData = db.pins[inputPin];
+    const errorMsg = document.getElementById('pin-error');
+
+    if (!pinData) {
+        errorMsg.innerText = 'Invalid PIN. Please check and try again.';
+        errorMsg.style.display = 'block';
+        return;
+    }
+
+    if (pinData.deviceId !== getDeviceId()) {
+        errorMsg.innerText = 'Fraud Alert: This PIN was purchased on a different device!';
+        errorMsg.style.display = 'block';
+        return;
+    }
+
+    errorMsg.style.display = 'none';
+    document.getElementById('actual-answers').innerText = 'Loading content...';
+    document.getElementById('content-display').style.display = 'block';
+
+    let contentText = "";
+    const examContent = db.content[pinData.examId] || {};
+    
+    pinData.subjects.forEach(sub => {
+        const answer = examContent[sub] || 'No answer uploaded yet for this subject.';
+        contentText += `--- ${sub.toUpperCase()} ---\n${answer}\n\n`;
+    });
+
+    document.getElementById('actual-answers').innerText = contentText;
+}
+
+function submitEnquiry(e) {
+    e.preventDefault();
+    alert('Thank you! Your message has been sent to Success Academy.');
+    document.getElementById('enquiryForm').reset();
+}
+
+window.onload = () => {
+    if(document.getElementById('home-exam-grid')) renderExams();
+};
