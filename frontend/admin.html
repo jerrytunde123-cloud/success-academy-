@@ -22,6 +22,12 @@
         .btn-reply { background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 10px; width: 400px; }
+        
+        /* Gallery Styles */
+        .image-gallery { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .image-thumbnail { position: relative; width: 100px; height: 100px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; }
+        .image-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+        .delete-img-btn { position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; }
     </style>
 </head>
 <body>
@@ -52,31 +58,33 @@
             </div>
 
             <div class="section" id="content-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px;">
-                <h3>Upload Content & Image</h3>
+                <h3>Upload Content & Images</h3>
                 <label>Select Subject:</label> <select id="subject-select" onchange="loadSubjectData()"></select>
-                <label>Upload Image (JPEG/PNG):</label> <input type="file" id="image-upload" accept="image/*">
-                <img id="preview-img" style="max-height:100px; display:none; margin-bottom:10px;">
-                <label>Answers:</label> <textarea id="content-input" rows="5"></textarea>
-                <button class="save-btn" onclick="saveSubjectData()">Save Subject</button>
+                
+                <!-- Image Gallery Section -->
+                <label style="margin-top:10px; display:block;">Subject Thumbnails (Max 25):</label>
+                <div id="image-gallery" class="image-gallery">
+                    <!-- Thumbnails injected via JS -->
+                </div>
+
+                <label>Upload Images (Max 5 at once):</label> 
+                <input type="file" id="image-upload" accept="image/*" multiple>
+                
+                <label style="margin-top:10px; display:block;">Answers:</label> 
+                <textarea id="content-input" rows="5"></textarea>
+                
+                <button class="save-btn" style="margin-top:10px;" onclick="saveSubjectData()">Save Subject</button>
             </div>
         </div>
 
-        <!-- PINS TAB -->
+        <!-- PINS TAB (Unchanged) -->
         <div id="tab-pins" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3>Generate Manual PIN</h3>
-                <div class="row">
-                    <select id="manual-exam-select" onchange="loadManualSubjects()"></select>
-                </div>
-                <div class="row">
-                    <input type="text" id="manual-device-id" placeholder="Enter User's Device ID (Required)">
-                </div>
-                <div class="row">
-                    <input type="text" id="manual-pin-input" placeholder="Enter Custom PIN (e.g. ABC123)">
-                </div>
-                <div id="manual-subjects-area" style="max-height: 100px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:10px;">
-                    <!-- Checkboxes -->
-                </div>
+                <div class="row"><select id="manual-exam-select" onchange="loadManualSubjects()"></select></div>
+                <div class="row"><input type="text" id="manual-device-id" placeholder="Enter User's Device ID (Required)"></div>
+                <div class="row"><input type="text" id="manual-pin-input" placeholder="Enter Custom PIN (e.g. ABC123)"></div>
+                <div id="manual-subjects-area" style="max-height: 100px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:10px;"></div>
                 <button class="save-btn" onclick="generateManualPin()">Generate PIN</button>
             </div>
 
@@ -87,7 +95,7 @@
             </table>
         </div>
 
-        <!-- ENQUIRIES TAB -->
+        <!-- ENQUIRIES TAB (Unchanged) -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
@@ -97,6 +105,7 @@
         </div>
     </div>
 
+    <!-- REPLY MODAL -->
     <div id="reply-modal" class="modal">
         <div class="modal-content">
             <h3>Reply to <span id="reply-name"></span></h3>
@@ -118,6 +127,7 @@
         
         let exams = [];
         let activeExam = null;
+        let activeSubject = null;
         let currentReplyData = null;
 
         function switchTab(tabId, event) {
@@ -125,7 +135,6 @@
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById('tab-' + tabId).classList.add('active');
-            
             if(tabId === 'enquiries') loadEnquiries();
             if(tabId === 'pins') loadPinHistory();
         }
@@ -135,12 +144,10 @@
                 const res = await fetch(`${API_URL}/exams`);
                 exams = await res.json();
                 
-                // Populate Main Dropdown
                 const select = document.getElementById('exam-select');
                 select.innerHTML = '<option value="">-- Select Exam --</option>';
                 exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
 
-                // Populate Manual PIN Dropdown
                 const manualSelect = document.getElementById('manual-exam-select');
                 exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
                 loadManualSubjects();
@@ -170,14 +177,39 @@
             loadSubjectData();
         }
 
+        // Updated to load image gallery
         function loadSubjectData() {
             const subName = document.getElementById('subject-select').value;
-            const subject = activeExam.subjects.find(s => s.name === subName);
-            document.getElementById('content-input').value = subject.content || '';
-            const imgPreview = document.getElementById('preview-img');
-            if(subject.previewImage) { imgPreview.src = subject.previewImage; imgPreview.style.display = 'block'; } 
-            else { imgPreview.style.display = 'none'; }
+            activeSubject = activeExam.subjects.find(s => s.name === subName);
+            
+            document.getElementById('content-input').value = activeSubject.content || '';
+            
+            // Render Image Gallery
+            const gallery = document.getElementById('image-gallery');
+            gallery.innerHTML = '';
+            const images = activeSubject.previewImages || [];
+            
+            if(images.length === 0) {
+                gallery.innerHTML = '<p style="font-size:12px; color:#666;">No images uploaded yet.</p>';
+            } else {
+                images.forEach((imgUrl, index) => {
+                    gallery.innerHTML += `
+                        <div class="image-thumbnail">
+                            <img src="${imgUrl}" alt="Preview">
+                            <button class="delete-img-btn" onclick="removeImage(${index})" title="Delete Image">×</button>
+                        </div>
+                    `;
+                });
+            }
         }
+
+        // Function to delete an image from the list
+        window.removeImage = function(index) {
+            if(confirm('Delete this image?')) {
+                activeSubject.previewImages.splice(index, 1);
+                loadSubjectData(); // Re-render gallery
+            }
+        };
 
         async function saveConfig() {
             const updatedData = {
@@ -196,24 +228,59 @@
             alert('Prices Updated!');
         }
 
+        // Updated to handle multiple image uploads
         async function saveSubjectData() {
             const subName = document.getElementById('subject-select').value;
             const content = document.getElementById('content-input').value;
-            const imageFile = document.getElementById('image-upload').files[0];
-            let imageUrl = activeExam.subjects.find(s => s.name === subName).previewImage;
-
-            if (imageFile) {
-                const formData = new FormData();
-                formData.append('image', imageFile);
-                const uploadRes = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
-                const uploadData = await uploadRes.json();
-                imageUrl = uploadData.imageUrl;
+            const fileInput = document.getElementById('image-upload');
+            
+            // Check current number of images
+            let currentImages = activeSubject.previewImages || [];
+            if(currentImages.length >= 25) {
+                return alert('You have reached the maximum limit of 25 images for this subject.');
             }
 
-            const updatedSubjects = activeExam.subjects.map(sub => sub.name === subName ? { ...sub, content: content, previewImage: imageUrl } : sub);
-            await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subjects: updatedSubjects }) });
-            alert('Content Saved!');
-            document.getElementById('image-upload').value = '';
+            if (fileInput.files.length > 0) {
+                if (fileInput.files.length > 5) {
+                    return alert('You can only upload a maximum of 5 images at once.');
+                }
+
+                const formData = new FormData();
+                for(let i = 0; i < fileInput.files.length; i++) {
+                    formData.append('images', fileInput.files[i]);
+                }
+
+                try {
+                    const uploadRes = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+                    const uploadData = await uploadRes.json();
+                    
+                    if(uploadData.imageUrls) {
+                        // Append new images to existing ones
+                        currentImages = [...currentImages, ...uploadData.imageUrls];
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Failed to upload images.');
+                    return;
+                }
+            }
+
+            const updatedSubjects = activeExam.subjects.map(sub => {
+                if(sub.name === subName) {
+                    return { ...sub, content: content, previewImages: currentImages };
+                }
+                return sub;
+            });
+
+            await fetch(`${API_URL}/exams/${activeExam._id}`, { 
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ subjects: updatedSubjects }) 
+            });
+            
+            alert('Subject Data Saved!');
+            fileInput.value = ''; // Clear input
+            loadSubjectData(); // Refresh gallery
         }
 
         // --- PIN MANAGEMENT ---
@@ -222,7 +289,6 @@
             const pins = await res.json();
             const tbody = document.getElementById('pins-table-body');
             tbody.innerHTML = '';
-            
             pins.forEach(p => {
                 tbody.innerHTML += `
                     <tr>
@@ -251,13 +317,12 @@
             const examId = document.getElementById('manual-exam-select').value;
             const deviceId = document.getElementById('manual-device-id').value.trim().toUpperCase();
             const customPin = document.getElementById('manual-pin-input').value.trim();
-            
             const checked = document.querySelectorAll('input[name="manual-sub"]:checked');
             const subjects = Array.from(checked).map(cb => cb.value);
 
-            if(!deviceId) return alert('Device ID is required so the user can access it.');
+            if(!deviceId) return alert('Device ID is required.');
             if(subjects.length === 0) return alert('Select at least one subject.');
-            if(!customPin) return alert('Enter a custom PIN (e.g., ABC123).');
+            if(!customPin) return alert('Enter a custom PIN.');
 
             try {
                 const res = await fetch(`${API_URL}/pins`, {
@@ -268,7 +333,7 @@
                 const data = await res.json();
                 if(data.success) {
                     alert(`PIN Generated Successfully: ${data.pin}`);
-                    loadPinHistory(); // Refresh table
+                    loadPinHistory();
                 } else {
                     alert(data.error);
                 }
