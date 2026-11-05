@@ -12,25 +12,24 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Wjh7YkO58X901Q9p>@cluster.f4jypw9.mongodb.net/
-';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Wjh7YkO58X901Q9p>@cluster.f4jypw9.mongodb.net/';
 
 mongoose.connect(MONGO_URI)
 .then(async () => {
     console.log('MongoDB Connected');
     const count = await Exam.countDocuments();
     if (count === 0) {
-        const defaultSubjects = ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', previewImages: [] }));
+        const defaultSubjects = ['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', thumbnail: '', qaImages: [] }));
         await Exam.insertMany([
-            { name: 'WAEC', logo: 'waec-logo.png', subjects: defaultSubjects },
-            { name: 'WAEC GCE', logo: 'waec-logo.png', subjects: defaultSubjects },
-            { name: 'NECO', logo: 'neco-logo.png', subjects: defaultSubjects },
-            { name: 'NECO GCE', logo: 'neco-logo.png', subjects: defaultSubjects },
-            { name: 'JAMB', logo: 'jamb-logo.png', subjects: defaultSubjects },
-            { name: 'POST UTME', logo: 'putme-logo.png', subjects: defaultSubjects },
-            { name: 'JUPEB', logo: 'jupeb-logo.png', subjects: defaultSubjects },
-            { name: 'IJMB', logo: 'ijmb-logo.png', subjects: defaultSubjects },
-            { name: 'NABTEB', logo: 'nabteb-logo.png', subjects: defaultSubjects }
+            { name: 'WAEC', slug: 'waec', logo: 'waec-logo.png', subjects: defaultSubjects },
+            { name: 'WAEC GCE', slug: 'waecgce', logo: 'waec-logo.png', subjects: defaultSubjects },
+            { name: 'NECO', slug: 'neco', logo: 'neco-logo.png', subjects: defaultSubjects },
+            { name: 'NECO GCE', slug: 'necogce', logo: 'neco-logo.png', subjects: defaultSubjects },
+            { name: 'JAMB', slug: 'jamb', logo: 'jamb-logo.png', subjects: defaultSubjects },
+            { name: 'POST UTME', slug: 'postutme', logo: 'putme-logo.png', subjects: defaultSubjects },
+            { name: 'JUPEB', slug: 'jupeb', logo: 'jupeb-logo.png', subjects: defaultSubjects },
+            { name: 'IJMB', slug: 'ijmb', logo: 'ijmb-logo.png', subjects: defaultSubjects },
+            { name: 'NABTEB', slug: 'nabteb', logo: 'nabteb-logo.png', subjects: defaultSubjects }
         ]);
         console.log('Database seeded.');
     }
@@ -41,26 +40,37 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => { cb(null, 'uploads/'); },
     filename: (req, file, cb) => { cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname)); }
 });
-
-// Allow up to 5 files per upload
-const upload = multer({ storage, limits: { files: 5 } });
+const upload = multer({ storage });
 
 // --- ROUTES ---
 app.get('/api/exams', async (req, res) => {
     try { res.json(await Exam.find()); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Get specific exam by slug (for share links)
+app.get('/api/exams/:slug', async (req, res) => {
+    try { 
+        const exam = await Exam.findOne({ slug: req.params.slug });
+        if(!exam) return res.status(404).json({error: 'Exam not found'});
+        res.json(exam); 
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.put('/api/exams/:id', async (req, res) => {
     try { res.json(await Exam.findByIdAndUpdate(req.params.id, req.body, { new: true })); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// UPDATED: Upload Multiple Images
-app.post('/api/upload', upload.array('images', 5), (req, res) => {
+// Separate uploads for Thumbnail vs QA Images
+app.post('/api/upload/thumbnail', upload.single('image'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
+    res.json({ imageUrl: `${baseUrl}/uploads/${req.file.filename}` });
+});
+
+app.post('/api/upload/qa', upload.array('images', 25), (req, res) => {
     if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-    
     const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
     const imageUrls = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
-    
     res.json({ imageUrls });
 });
 
