@@ -5,7 +5,7 @@
     <title>Admin Dashboard | Success Academy</title>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: none; }
         .login-box { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
         .login-box input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
@@ -47,7 +47,7 @@
     <div id="dashboard" class="container">
         <div class="header">
             <h1>Admin Dashboard</h1>
-            <a href="index.html" onclick="localStorage.removeItem('sa_admin_logged_in')" style="background:#ff4444; color:white; padding:10px; text-decoration:none; border-radius:5px;">Log Out</a>
+            <a href="index.html" style="background:#ff4444; color:white; padding:10px; text-decoration:none; border-radius:5px;">Log Out</a>
         </div>
 
         <div class="tabs">
@@ -138,33 +138,10 @@
     </div>
 
     <script>
-        // ==========================================
-        // 1. CONFIGURATION (MUST BE AT THE TOP)
-        // ==========================================
-        
         // ⚠️ ADMIN PASSWORD (Change this to whatever you want)
         const ADMIN_PASSWORD = "admin123"; 
 
-        // ⚠️ BACKEND URL (Trailing slash added to fix Vercel routing issue)
-        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api/'; 
-
-        // ⚠️ EMAILJS CONFIG
-        emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
-        const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
-        const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
-
-        // ==========================================
-        // 2. GLOBAL VARIABLES
-        // ==========================================
-        let exams = [];
-        let activeExam = null;
-        let activeSubject = null;
-        let currentReplyData = null;
-
-        // ==========================================
-        // 3. INITIALIZATION & LOGIN LOGIC
-        // ==========================================
-        // Check if already logged in (Now API_URL exists, so this will work)
+        // Check if already logged in
         if(localStorage.getItem('sa_admin_logged_in') === 'true') {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
@@ -183,9 +160,31 @@
             }
         }
 
+        // ⚠️ EMAILJS CONFIG
+        emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
+        const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
+        const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+
+        // ⚠️ BACKEND URL
+        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
+        
+        let exams = [];
+        let activeExam = null;
+        let activeSubject = null;
+        let currentReplyData = null;
+
+        function switchTab(tabId, event) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+            if(tabId === 'enquiries') loadEnquiries();
+            if(tabId === 'pins') loadPinHistory();
+        }
+
         async function initDashboard() {
             try {
-                const res = await fetch(`${API_URL}exams`, { cache: "no-store" });
+                const res = await fetch(`${API_URL}/exams`, { cache: "no-store" });
                 exams = await res.json();
                 
                 const select = document.getElementById('exam-select');
@@ -197,27 +196,9 @@
                 exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
                 loadManualSubjects();
 
-            } catch (e) { 
-                console.error(e);
-                alert("Failed to connect to backend. Check console for details."); 
-            }
+            } catch (e) { alert("Failed to connect to backend. Check console for details."); }
         }
 
-        // ==========================================
-        // 4. TAB SWITCHING
-        // ==========================================
-        function switchTab(tabId, event) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            event.target.classList.add('active');
-            document.getElementById('tab-' + tabId).classList.add('active');
-            if(tabId === 'enquiries') loadEnquiries();
-            if(tabId === 'pins') loadPinHistory();
-        }
-
-        // ==========================================
-        // 5. EXAM MANAGEMENT
-        // ==========================================
         function loadExamConfig() {
             const id = document.getElementById('exam-select').value;
             if(!id) return;
@@ -290,13 +271,10 @@
                     all_subjects: document.getElementById('allow-all').checked
                 }
             };
-            await fetch(`${API_URL}exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
+            await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
             alert('Prices Updated! Refresh the main website to see changes.');
         }
 
-        // ==========================================
-        // 6. IMAGE UPLOADS
-        // ==========================================
         async function uploadThumbnail() {
             const fileInput = document.getElementById('thumbnail-upload');
             if (fileInput.files.length === 0) return alert('Select an image first.');
@@ -305,7 +283,7 @@
             formData.append('image', fileInput.files[0]);
 
             try {
-                const res = await fetch(`${API_URL}upload/thumbnail`, { method: 'POST', body: formData });
+                const res = await fetch(`${API_URL}/upload/thumbnail`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if(data.imageUrl) {
                     activeSubject.thumbnail = data.imageUrl;
@@ -329,7 +307,7 @@
             for(let i=0; i<fileInput.files.length; i++) formData.append('images', fileInput.files[i]);
 
             try {
-                const res = await fetch(`${API_URL}upload/qa`, { method: 'POST', body: formData });
+                const res = await fetch(`${API_URL}/upload/qa`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if(data.imageUrls) {
                     activeSubject.qaImages = [...currentQA, ...data.imageUrls];
@@ -349,18 +327,15 @@
 
         async function saveActiveSubjectToDB() {
             const updatedSubjects = activeExam.subjects.map(sub => sub.name === activeSubject.name ? activeSubject : sub);
-            await fetch(`${API_URL}exams/${activeExam._id}`, { 
+            await fetch(`${API_URL}/exams/${activeExam._id}`, { 
                 method: 'PUT', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ subjects: updatedSubjects }) 
             });
         }
 
-        // ==========================================
-        // 7. PIN MANAGEMENT
-        // ==========================================
         async function loadPinHistory() {
-            const res = await fetch(`${API_URL}admin/pins`, { cache: "no-store" });
+            const res = await fetch(`${API_URL}/admin/pins`, { cache: "no-store" });
             const pins = await res.json();
             const tbody = document.getElementById('pins-table-body');
             tbody.innerHTML = '';
@@ -400,7 +375,7 @@
             if(!customPin) return alert('Enter a custom PIN (e.g., ABC123).');
 
             try {
-                const res = await fetch(`${API_URL}pins`, {
+                const res = await fetch(`${API_URL}/pins`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ examId, subjects, deviceId, manualPin: customPin })
@@ -415,11 +390,8 @@
             } catch (e) { alert('Error generating PIN.'); }
         }
 
-        // ==========================================
-        // 8. ENQUIRIES & EMAIL REPLIES
-        // ==========================================
         async function loadEnquiries() {
-            const res = await fetch(`${API_URL}enquiries`, { cache: "no-store" });
+            const res = await fetch(`${API_URL}/enquiries`, { cache: "no-store" });
             const enquiries = await res.json();
             const tbody = document.getElementById('enquiry-table-body');
             tbody.innerHTML = '';
@@ -462,6 +434,11 @@
                 status.style.color = 'red';
                 status.innerText = 'Failed to send email.';
             }
+        }
+
+        function logout() {
+            localStorage.removeItem('sa_admin_logged_in');
+            window.location.href = 'index.html';
         }
     </script>
 </body>
