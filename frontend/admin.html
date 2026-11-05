@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Admin Dashboard | Success Academy</title>
-    <!-- EmailJS Library -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 10px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .header { display: flex; justify-content: space-between; border-bottom: 2px solid #001f5b; padding-bottom: 15px; margin-bottom: 20px; }
         .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
         .tab { padding: 10px 20px; background: #ddd; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; }
@@ -37,13 +36,12 @@
             <button class="tab" onclick="switchTab('enquiries')">View Enquiries</button>
         </div>
 
-        <!-- EXAMS TAB -->
         <div id="tab-exams" class="section active">
             <select id="exam-select" onchange="loadExamConfig()">
                 <option value="">-- Select Exam --</option>
             </select>
 
-            <div class="section" id="config-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px;">
+            <div class="section" id="config-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom: 20px;">
                 <h3>Configure <span id="config-name"></span></h3>
                 <div class="row"><label>Per Subject (₦):</label> <input type="number" id="price-per-subject"> <input type="checkbox" id="allow-per-subject"> Enable</div>
                 <div class="row"><label>Per Dept (₦):</label> <input type="number" id="price-per-dept"> <input type="checkbox" id="allow-per-dept"> Enable</div>
@@ -51,7 +49,7 @@
                 <button class="save-btn" onclick="saveConfig()">Save Prices</button>
             </div>
 
-            <div class="section" id="content-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px; margin-top:20px;">
+            <div class="section" id="content-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px;">
                 <h3>Upload Content & Image</h3>
                 <label>Select Subject:</label> <select id="subject-select" onchange="loadSubjectData()"></select>
                 <label>Upload Image (JPEG/PNG):</label> <input type="file" id="image-upload" accept="image/*">
@@ -61,23 +59,18 @@
             </div>
         </div>
 
-        <!-- ENQUIRIES TAB -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
-                <thead>
-                    <tr><th>Date</th><th>Name</th><th>Phone</th><th>Email</th><th>Exam</th><th>Message</th><th>Action</th></tr>
-                </thead>
+                <thead><tr><th>Date</th><th>Name</th><th>Phone</th><th>Email</th><th>Exam</th><th>Message</th><th>Action</th></tr></thead>
                 <tbody id="enquiry-table-body"></tbody>
             </table>
         </div>
     </div>
 
-    <!-- REPLY MODAL -->
     <div id="reply-modal" class="modal">
         <div class="modal-content">
             <h3>Reply to <span id="reply-name"></span></h3>
-            <p>To: <span id="reply-email"></span></p>
             <textarea id="reply-message" rows="4" placeholder="Type your reply..."></textarea>
             <button class="save-btn" onclick="sendEmailReply()" style="width:100%; margin-top:10px;">Send Email</button>
             <button onclick="closeModal()" style="width:100%; margin-top:5px; background:#ccc; border:none; padding:10px; border-radius:5px;">Cancel</button>
@@ -91,7 +84,9 @@
         const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
 
-        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api';
+        // ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL ⚠️
+        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
+        
         let exams = [];
         let activeExam = null;
         let currentReplyData = null;
@@ -104,12 +99,14 @@
             if(tabId === 'enquiries') loadEnquiries();
         }
 
-        // --- EXAMS LOGIC ---
         window.onload = async () => {
-            const res = await fetch(`${API_URL}/exams`);
-            exams = await res.json();
-            const select = document.getElementById('exam-select');
-            exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
+            try {
+                const res = await fetch(`${API_URL}/exams`);
+                exams = await res.json();
+                const select = document.getElementById('exam-select');
+                select.innerHTML = '<option value="">-- Select Exam --</option>';
+                exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
+            } catch (e) { alert("Failed to connect to backend."); }
         };
 
         function loadExamConfig() {
@@ -179,13 +176,11 @@
             document.getElementById('image-upload').value = '';
         }
 
-        // --- ENQUIRIES LOGIC ---
         async function loadEnquiries() {
             const res = await fetch(`${API_URL}/enquiries`);
             const enquiries = await res.json();
             const tbody = document.getElementById('enquiry-table-body');
             tbody.innerHTML = '';
-            
             enquiries.forEach(enq => {
                 tbody.innerHTML += `
                     <tr>
@@ -204,7 +199,6 @@
         function openReply(name, email) {
             currentReplyData = { name, email };
             document.getElementById('reply-name').innerText = name;
-            document.getElementById('reply-email').innerText = email;
             document.getElementById('reply-message').value = '';
             document.getElementById('email-status').innerText = '';
             document.getElementById('reply-modal').style.display = 'flex';
@@ -216,15 +210,8 @@
             const msg = document.getElementById('reply-message').value;
             const status = document.getElementById('email-status');
             if(!msg) return alert('Type a message');
-            
             status.innerText = 'Sending...';
-            
-            const templateParams = {
-                to_name: currentReplyData.name,
-                to_email: currentReplyData.email,
-                reply_message: msg
-            };
-
+            const templateParams = { to_name: currentReplyData.name, to_email: currentReplyData.email, reply_message: msg };
             try {
                 await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
                 status.innerText = 'Email Sent Successfully!';
@@ -232,7 +219,6 @@
             } catch (error) {
                 status.style.color = 'red';
                 status.innerText = 'Failed to send email.';
-                console.error(error);
             }
         }
     </script>
