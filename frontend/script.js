@@ -1,11 +1,11 @@
-// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL ⚠️
-const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
+const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // ⚠️ REPLACE THIS
 
 let dbExams = [];
 let currentExam = null;
 let currentPackageType = null;
 let currentPrice = 0;
 
+// --- DEVICE ID & LOCAL PIN STORAGE ---
 function getDeviceId() {
     let deviceId = localStorage.getItem('sa_device_id');
     if (!deviceId) {
@@ -15,40 +15,96 @@ function getDeviceId() {
     return deviceId;
 }
 
+function savePinLocally(pinData) {
+    let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
+    // Prevent duplicates
+    if(!history.some(p => p.pin === pinData.pin)) {
+        history.push(pinData);
+        localStorage.setItem('sa_my_pins', JSON.stringify(history));
+    }
+}
+
+function loadMyPinHistory() {
+    const container = document.getElementById('pin-history-container');
+    if (!container) return;
+    container.innerHTML = '';
+    let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
+    
+    if (history.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:#666;">You have not purchased any PINs on this device yet.</p>';
+        return;
+    }
+
+    history.reverse().forEach(item => {
+        // Find exam name
+        const exam = dbExams.find(e => e._id === item.examId);
+        const examName = exam ? exam.name : 'Unknown Exam';
+        const date = new Date(item.date).toLocaleDateString();
+        const subjects = item.subjects.join(', ');
+
+        container.innerHTML += `
+            <div style="background:white; border:1px solid #ddd; padding:15px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h4 style="color:var(--primary-blue); margin-bottom:5px;">${examName} <span style="font-size:12px; color:#666;">(${date})</span></h4>
+                    <p style="font-size:14px; color:#444;"><strong>Subjects:</strong> ${subjects}</p>
+                </div>
+                <div style="text-align:center;">
+                    <h3 style="color:green; letter-spacing:2px; margin-bottom:5px;">${item.pin}</h3>
+                    <button onclick="copyToClipboard('${item.pin}')" style="background:#25D366; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-size:12px;">Copy PIN</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text);
+    alert('Copied: ' + text);
+}
+
+// --- NAVIGATION & RENDERING ---
 function showPage(pageId) {
     document.querySelectorAll('main').forEach(main => main.style.display = 'none');
     document.getElementById('page-' + pageId).style.display = 'block';
+    if(pageId === 'history') loadMyPinHistory();
 }
 
 async function fetchExams() {
     try {
         const response = await fetch(`${API_URL}/exams`);
-        if (!response.ok) throw new Error("Backend error");
         dbExams = await response.json();
         renderExams();
-    } catch (error) { 
-        console.error("Error fetching exams:", error); 
-        alert("Failed to load exams. The backend server might be asleep or disconnected.");
-    }
+        checkSharedLink(); // Check if user is visiting via a share link
+    } catch (error) { console.error("Error fetching exams:", error); }
 }
 
 function renderExams() {
     const grid = document.getElementById('home-exam-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    
     dbExams.forEach(exam => {
         const card = document.createElement('div');
         card.className = 'exam-card';
         card.onclick = () => openExamPackages(exam._id);
-        
         const fallbackImg = 'https://via.placeholder.com/60/001f5b/ffcc00?text=' + exam.name.substring(0,2);
-        card.innerHTML = `
-            <img src="${exam.logo || fallbackImg}" onerror="this.src='${fallbackImg}'">
-            <h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">${exam.name}</h3>
-        `;
+        card.innerHTML = `<img src="${exam.logo || fallbackImg}" onerror="this.src='${fallbackImg}'"><h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">${exam.name}</h3>`;
         grid.appendChild(card);
     });
+}
+
+// SHAREABLE LINKS LOGIC
+function checkSharedLink() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const examId = urlParams.get('exam');
+    if (examId) {
+        openExamPackages(examId);
+    }
+}
+
+function shareExamLink(examId) {
+    const url = `${window.location.origin}${window.location.pathname}?exam=${examId}`;
+    navigator.clipboard.writeText(url);
+    alert('Shareable link copied! You can send this to users to take them directly to this exam.');
 }
 
 function openExamPackages(examId) {
@@ -56,6 +112,8 @@ function openExamPackages(examId) {
     if (!currentExam) return;
 
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
+    document.getElementById('share-link-btn').onclick = () => shareExamLink(examId);
+    
     document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
     document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
     document.getElementById('price-all-subjects').innerText = currentExam.prices.all_subjects;
@@ -123,7 +181,7 @@ function payWithPaystack() {
     }
 
     let handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -142,6 +200,14 @@ async function generatePIN(selectedSubjects) {
         });
         const data = await response.json();
         if (data.success) {
+            // Save to local history
+            savePinLocally({ 
+                pin: data.pin, 
+                examId: currentExam._id, 
+                subjects: subjectNames, 
+                date: new Date().toISOString() 
+            });
+
             document.getElementById('generated-pin').innerText = data.pin;
             document.getElementById('success-modal').style.display = 'flex';
         }
@@ -162,17 +228,15 @@ async function verifyAndShowContent() {
 
         errorMsg.style.display = 'none';
         document.getElementById('content-display').style.display = 'block';
-        const examInfo = dbExams.find(e => e._id === result.data.examId);
         let contentText = "";
         result.data.subjects.forEach(subName => {
-            const subjectData = examInfo.subjects.find(s => s.name === subName);
+            const subjectData = result.data.examId.subjects.find(s => s.name === subName);
             if (subjectData) contentText += `--- ${subjectData.name.toUpperCase()} ---\n${subjectData.content || 'No content yet'}\n\n`;
         });
         document.getElementById('actual-answers').innerText = contentText;
     } catch (error) { errorMsg.innerText = 'Connection error.'; errorMsg.style.display = 'block'; }
 }
 
-// Contact Form
 document.getElementById('enquiryForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     const data = {
@@ -183,13 +247,8 @@ document.getElementById('enquiryForm')?.addEventListener('submit', async functio
         message: document.getElementById('message').value
     };
     try {
-        await fetch(`${API_URL}/enquiries`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        alert('Message sent successfully!');
-        this.reset();
+        await fetch(`${API_URL}/enquiries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        alert('Message sent successfully!'); this.reset();
     } catch (err) { alert('Failed to send message.'); }
 });
 
