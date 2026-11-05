@@ -6,7 +6,9 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: none; }
+        .login-box { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        .login-box input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
         .header { display: flex; justify-content: space-between; border-bottom: 2px solid #001f5b; padding-bottom: 15px; margin-bottom: 20px; }
         .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .tab { padding: 10px 20px; background: #ddd; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; }
@@ -15,7 +17,6 @@
         .section.active { display: block; }
         input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
         button.save-btn { background: #001f5b; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        button.save-btn:hover { background: #003399; }
         .row { display: flex; gap: 15px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;}
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
@@ -23,12 +24,8 @@
         .btn-reply { background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;}
         .modal-content { background: white; padding: 20px; border-radius: 10px; width: 400px; max-width: 90%; }
-        
-        /* Upload Sections Styling */
         .upload-box { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; background: #fff; }
         .upload-box h4 { margin: 0 0 10px 0; color: #001f5b; }
-        
-        /* Image Gallery Styles */
         .image-gallery { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
         .image-thumbnail { position: relative; width: 100px; height: 100px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; }
         .image-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
@@ -36,7 +33,18 @@
     </style>
 </head>
 <body>
-    <div class="container">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="login-box">
+        <h2 style="color:#001f5b;">Admin Login</h2>
+        <p>Enter password to access the dashboard.</p>
+        <input type="password" id="admin-password" placeholder="Enter Password">
+        <button class="save-btn" style="width:100%;" onclick="checkPassword()">Login</button>
+        <p id="login-error" style="color:red; display:none; margin-top:10px;">Incorrect Password!</p>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="dashboard" class="container">
         <div class="header">
             <h1>Admin Dashboard</h1>
             <a href="index.html" style="background:#ff4444; color:white; padding:10px; text-decoration:none; border-radius:5px;">Log Out</a>
@@ -54,7 +62,6 @@
                 <option value="">-- Select Exam --</option>
             </select>
 
-            <!-- Exam Config (Prices) -->
             <div class="section" id="config-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom: 20px;">
                 <h3>Configure <span id="config-name"></span></h3>
                 <div class="row"><label style="width:120px;">Per Subject (₦):</label> <input type="number" id="price-per-subject"> <label><input type="checkbox" id="allow-per-subject"> Enable</label></div>
@@ -63,13 +70,11 @@
                 <button class="save-btn" onclick="saveConfig()">Save Prices</button>
             </div>
 
-            <!-- Exam Content Upload -->
             <div class="section" id="content-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px;">
                 <h3>Upload Content & Images</h3>
                 <label>Select Subject:</label> 
                 <select id="subject-select" onchange="loadSubjectData()"></select>
                 
-                <!-- 1. SINGLE THUMBNAIL UPLOAD -->
                 <div class="upload-box">
                     <h4>Public Thumbnail (1 Image)</h4>
                     <div id="thumbnail-preview" style="margin-bottom:10px;"></div>
@@ -77,7 +82,6 @@
                     <button class="save-btn" style="margin-top:5px; font-size:12px;" onclick="uploadThumbnail()">Upload Thumbnail</button>
                 </div>
 
-                <!-- 2. MULTIPLE Q&A IMAGES UPLOAD -->
                 <div class="upload-box">
                     <h4>Private Q&A Images (Max 25 total)</h4>
                     <div id="qa-gallery" class="image-gallery"></div>
@@ -85,7 +89,6 @@
                     <button class="save-btn" style="margin-top:5px; font-size:12px;" onclick="uploadQAImages()">Upload Q&A Images (Max 5 at once)</button>
                 </div>
 
-                <!-- 3. TEXT CONTENT -->
                 <div class="upload-box">
                     <h4>Text Answers</h4>
                     <textarea id="content-input" rows="5" placeholder="Paste text answers here..."></textarea>
@@ -135,13 +138,35 @@
     </div>
 
     <script>
-        // ⚠️ EMAILJS CONFIG (Update these with your keys)
+        // ⚠️ ADMIN PASSWORD (Change this to whatever you want)
+        const ADMIN_PASSWORD = "admin123"; 
+
+        // Check if already logged in
+        if(localStorage.getItem('sa_admin_logged_in') === 'true') {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            initDashboard();
+        }
+
+        function checkPassword() {
+            const input = document.getElementById('admin-password').value;
+            if(input === ADMIN_PASSWORD) {
+                localStorage.setItem('sa_admin_logged_in', 'true');
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                initDashboard();
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        // ⚠️ EMAILJS CONFIG
         emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
         const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
         const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
 
-        // ⚠️ BACKEND URL (Update this with your Render URL)
-        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
+        // ⚠️ BACKEND URL
+        const API_URL = 'https://success-academy-backend-mh1o.onrender.com/'; 
         
         let exams = [];
         let activeExam = null;
@@ -153,30 +178,27 @@
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById('tab-' + tabId).classList.add('active');
-            
             if(tabId === 'enquiries') loadEnquiries();
             if(tabId === 'pins') loadPinHistory();
         }
 
-        window.onload = async () => {
+        async function initDashboard() {
             try {
-                const res = await fetch(`${API_URL}/exams`);
+                const res = await fetch(`${API_URL}/exams`, { cache: "no-store" });
                 exams = await res.json();
                 
-                // Populate Exam Management Dropdown
                 const select = document.getElementById('exam-select');
                 select.innerHTML = '<option value="">-- Select Exam --</option>';
                 exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
 
-                // Populate Manual PIN Dropdown
                 const manualSelect = document.getElementById('manual-exam-select');
+                manualSelect.innerHTML = '';
                 exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
                 loadManualSubjects();
 
             } catch (e) { alert("Failed to connect to backend. Check console for details."); }
-        };
+        }
 
-        // --- EXAM MANAGEMENT ---
         function loadExamConfig() {
             const id = document.getElementById('exam-select').value;
             if(!id) return;
@@ -204,7 +226,6 @@
             
             document.getElementById('content-input').value = activeSubject.content || '';
             
-            // Render Thumbnail Preview
             const thumbPreview = document.getElementById('thumbnail-preview');
             if(activeSubject.thumbnail) {
                 thumbPreview.innerHTML = `<img src="${activeSubject.thumbnail}" style="width:100px; height:100px; object-fit:cover; border-radius:5px; border:1px solid #ccc;">`;
@@ -212,7 +233,6 @@
                 thumbPreview.innerHTML = `<p style="font-size:12px; color:#666;">No thumbnail uploaded.</p>`;
             }
 
-            // Render QA Gallery
             const gallery = document.getElementById('qa-gallery');
             gallery.innerHTML = '';
             const images = activeSubject.qaImages || [];
@@ -231,7 +251,6 @@
             }
         }
 
-        // Delete a Q&A image from the local array
         window.removeQAImage = function(index) {
             if(confirm('Delete this image?')) {
                 activeSubject.qaImages.splice(index, 1);
@@ -253,7 +272,7 @@
                 }
             };
             await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
-            alert('Prices Updated!');
+            alert('Prices Updated! Refresh the main website to see changes.');
         }
 
         async function uploadThumbnail() {
@@ -303,7 +322,7 @@
         async function saveTextContent() {
             activeSubject.content = document.getElementById('content-input').value;
             await saveActiveSubjectToDB();
-            alert('Text Answers Saved!');
+            alert('Text Answers Saved! Refresh the main website to see changes.');
         }
 
         async function saveActiveSubjectToDB() {
@@ -315,9 +334,8 @@
             });
         }
 
-        // --- PIN MANAGEMENT ---
         async function loadPinHistory() {
-            const res = await fetch(`${API_URL}/admin/pins`);
+            const res = await fetch(`${API_URL}/admin/pins`, { cache: "no-store" });
             const pins = await res.json();
             const tbody = document.getElementById('pins-table-body');
             tbody.innerHTML = '';
@@ -365,16 +383,15 @@
                 const data = await res.json();
                 if(data.success) {
                     alert(`PIN Generated Successfully: ${data.pin}`);
-                    loadPinHistory(); // Refresh table
+                    loadPinHistory(); 
                 } else {
                     alert(data.error);
                 }
             } catch (e) { alert('Error generating PIN.'); }
         }
 
-        // --- ENQUIRIES ---
         async function loadEnquiries() {
-            const res = await fetch(`${API_URL}/enquiries`);
+            const res = await fetch(`${API_URL}/enquiries`, { cache: "no-store" });
             const enquiries = await res.json();
             const tbody = document.getElementById('enquiry-table-body');
             tbody.innerHTML = '';
@@ -417,6 +434,11 @@
                 status.style.color = 'red';
                 status.innerText = 'Failed to send email.';
             }
+        }
+
+        function logout() {
+            localStorage.removeItem('sa_admin_logged_in');
+            window.location.href = 'index.html';
         }
     </script>
 </body>
