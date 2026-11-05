@@ -1,4 +1,6 @@
-const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // CHANGE THIS TO YOUR LIVE BACKEND URL LATER
+// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL ⚠️
+const API_URL = 'https://success-academy-backend.onrender.com/api'; 
+
 let dbExams = [];
 let currentExam = null;
 let currentPackageType = null;
@@ -21,25 +23,38 @@ function showPage(pageId) {
 async function fetchExams() {
     try {
         const response = await fetch(`${API_URL}/exams`);
+        if (!response.ok) throw new Error("Backend error");
         dbExams = await response.json();
         renderExams();
-    } catch (error) { console.error("Error fetching exams:", error); }
+    } catch (error) { 
+        console.error("Error fetching exams:", error); 
+        alert("Failed to load exams. The backend server might be asleep or disconnected.");
+    }
 }
 
 function renderExams() {
     const grid = document.getElementById('home-exam-grid');
+    if (!grid) return;
     grid.innerHTML = '';
+    
     dbExams.forEach(exam => {
         const card = document.createElement('div');
         card.className = 'exam-card';
         card.onclick = () => openExamPackages(exam._id);
-        card.innerHTML = `<img src="${exam.logo}" onerror="this.src='https://via.placeholder.com/60?text=EXAM'"><h3 style="color:var(--primary-blue); font-size:16px; margin-top:10px;">${exam.name}</h3>`;
+        
+        const fallbackImg = 'https://via.placeholder.com/60/001f5b/ffcc00?text=' + exam.name.substring(0,2);
+        card.innerHTML = `
+            <img src="${exam.logo || fallbackImg}" onerror="this.src='${fallbackImg}'">
+            <h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">${exam.name}</h3>
+        `;
         grid.appendChild(card);
     });
 }
 
 function openExamPackages(examId) {
     currentExam = dbExams.find(e => e._id === examId);
+    if (!currentExam) return;
+
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
     document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
     document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
@@ -48,6 +63,7 @@ function openExamPackages(examId) {
     document.getElementById('pkg-per-subject').style.display = currentExam.allow.per_subject ? 'block' : 'none';
     document.getElementById('pkg-per-dept').style.display = currentExam.allow.per_dept ? 'block' : 'none';
     document.getElementById('pkg-all-subjects').style.display = currentExam.allow.all_subjects ? 'block' : 'none';
+
     showPage('packages');
 }
 
@@ -86,7 +102,6 @@ function openCheckout(packageType) {
 function updatePreviewAndLimit(checkbox, max) {
     const checked = document.querySelectorAll('input[name="subject"]:checked');
     if (checked.length > max) { checkbox.checked = false; return; }
-    
     if (checkbox.checked) {
         const subData = currentExam.subjects.find(s => s.name === checkbox.value);
         document.getElementById('subject-preview-img').src = subData.previewImage || 'https://via.placeholder.com/300x150?text=No+Preview';
@@ -108,7 +123,7 @@ function payWithPaystack() {
     }
 
     let handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ INSERT PAYSTACK KEY HERE
+        key: 'pk_test_YOUR_PAYSTACK_KEY', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -119,7 +134,6 @@ function payWithPaystack() {
 async function generatePIN(selectedSubjects) {
     closeModal('checkout-modal');
     const subjectNames = currentPackageType === 'all_subjects' ? currentExam.subjects.map(s => s.name) : selectedSubjects;
-
     try {
         const response = await fetch(`${API_URL}/pins`, {
             method: 'POST',
@@ -137,7 +151,6 @@ async function generatePIN(selectedSubjects) {
 async function verifyAndShowContent() {
     const inputPin = document.getElementById('user-pin-input').value.toUpperCase();
     const errorMsg = document.getElementById('pin-error');
-
     try {
         const response = await fetch(`${API_URL}/pins/verify`, {
             method: 'POST',
@@ -145,12 +158,10 @@ async function verifyAndShowContent() {
             body: JSON.stringify({ pin: inputPin, deviceId: getDeviceId() })
         });
         const result = await response.json();
-
         if (!response.ok) { errorMsg.innerText = result.error; errorMsg.style.display = 'block'; return; }
 
         errorMsg.style.display = 'none';
         document.getElementById('content-display').style.display = 'block';
-        
         const examInfo = dbExams.find(e => e._id === result.data.examId);
         let contentText = "";
         result.data.subjects.forEach(subName => {
@@ -161,7 +172,7 @@ async function verifyAndShowContent() {
     } catch (error) { errorMsg.innerText = 'Connection error.'; errorMsg.style.display = 'block'; }
 }
 
-// Handle Contact Form Submission
+// Contact Form
 document.getElementById('enquiryForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
     const data = {
