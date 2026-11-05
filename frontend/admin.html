@@ -146,4 +146,95 @@
             const updatedData = {
                 prices: {
                     per_subject: Number(document.getElementById('price-per-subject').value),
-                    per_dept: Number(document.getElementById('
+                    per_dept: Number(document.getElementById('price-per-dept').value),
+                    all_subjects: Number(document.getElementById('price-all-subjects').value)
+                },
+                allow: {
+                    per_subject: document.getElementById('allow-per-subject').checked,
+                    per_dept: document.getElementById('allow-per-dept').checked,
+                    all_subjects: document.getElementById('allow-all').checked
+                }
+            };
+            await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
+            alert('Prices Updated!');
+        }
+
+        async function saveSubjectData() {
+            const subName = document.getElementById('subject-select').value;
+            const content = document.getElementById('content-input').value;
+            const imageFile = document.getElementById('image-upload').files[0];
+            let imageUrl = activeExam.subjects.find(s => s.name === subName).previewImage;
+
+            if (imageFile) {
+                const formData = new FormData();
+                formData.append('image', imageFile);
+                const uploadRes = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+                const uploadData = await uploadRes.json();
+                imageUrl = uploadData.imageUrl;
+            }
+
+            const updatedSubjects = activeExam.subjects.map(sub => sub.name === subName ? { ...sub, content: content, previewImage: imageUrl } : sub);
+            await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subjects: updatedSubjects }) });
+            alert('Content Saved!');
+            document.getElementById('image-upload').value = '';
+        }
+
+        // --- ENQUIRIES LOGIC ---
+        async function loadEnquiries() {
+            const res = await fetch(`${API_URL}/enquiries`);
+            const enquiries = await res.json();
+            const tbody = document.getElementById('enquiry-table-body');
+            tbody.innerHTML = '';
+            
+            enquiries.forEach(enq => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${new Date(enq.date).toLocaleDateString()}</td>
+                        <td>${enq.name}</td>
+                        <td>${enq.phone}</td>
+                        <td>${enq.email}</td>
+                        <td>${enq.exam}</td>
+                        <td>${enq.message}</td>
+                        <td><button class="btn-reply" onclick="openReply('${enq.name}','${enq.email}')">Reply</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function openReply(name, email) {
+            currentReplyData = { name, email };
+            document.getElementById('reply-name').innerText = name;
+            document.getElementById('reply-email').innerText = email;
+            document.getElementById('reply-message').value = '';
+            document.getElementById('email-status').innerText = '';
+            document.getElementById('reply-modal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('reply-modal').style.display = 'none'; }
+
+        async function sendEmailReply() {
+            const msg = document.getElementById('reply-message').value;
+            const status = document.getElementById('email-status');
+            if(!msg) return alert('Type a message');
+            
+            status.innerText = 'Sending...';
+            
+            const templateParams = {
+                to_name: currentReplyData.name,
+                to_email: currentReplyData.email,
+                reply_message: msg
+            };
+
+            try {
+                await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+                status.innerText = 'Email Sent Successfully!';
+                setTimeout(closeModal, 2000);
+            } catch (error) {
+                status.style.color = 'red';
+                status.innerText = 'Failed to send email.';
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
