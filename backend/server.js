@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs'); // Required to create the uploads folder
 const Exam = require('./models/Exam');
 const Pin = require('./models/Pin');
 const Enquiry = require('./models/Enquiry');
@@ -36,6 +37,11 @@ mongoose.connect(MONGO_URI)
 })
 .catch(err => console.log('MongoDB Connection Error:', err));
 
+// --- FIX: Ensure uploads folder exists ---
+if (!fs.existsSync('uploads')) {
+    fs.mkdirSync('uploads');
+}
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => { cb(null, 'uploads/'); },
     filename: (req, file, cb) => { cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname)); }
@@ -47,7 +53,6 @@ app.get('/api/exams', async (req, res) => {
     try { res.json(await Exam.find()); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Get specific exam by slug (for share links)
 app.get('/api/exams/:slug', async (req, res) => {
     try { 
         const exam = await Exam.findOne({ slug: req.params.slug });
@@ -60,7 +65,6 @@ app.put('/api/exams/:id', async (req, res) => {
     try { res.json(await Exam.findByIdAndUpdate(req.params.id, req.body, { new: true })); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Separate uploads for Thumbnail vs QA Images
 app.post('/api/upload/thumbnail', upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
