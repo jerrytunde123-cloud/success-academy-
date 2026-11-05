@@ -15,7 +15,7 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
 // Use Environment Variable for MongoDB (Better for Render)
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Jerry/2007>@cluster.f4jypw9.mongodb.net/success_academy?retryWrites=true&w=majority';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Wjh7YkO58X901Q9p>@cluster.f4jypw9.mongodb.net/success_academy?retryWrites=true&w=majority';
 
 mongoose.connect(MONGO_URI)
 .then(async () => {
