@@ -11,36 +11,11 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// Initialize Database Tables
 async function initDB() {
-    await db.execute(`
-        CREATE TABLE IF NOT EXISTS exams (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            slug TEXT,
-            logo TEXT,
-            prices TEXT,
-            allow TEXT,
-            subjects TEXT
-        );
-    `);
-    await db.execute(`
-        CREATE TABLE IF NOT EXISTS pins (
-            pin TEXT PRIMARY KEY,
-            examId TEXT,
-            subjects TEXT,
-            deviceId TEXT,
-            date TEXT
-        );
-    `);
-    await db.execute(`
-        CREATE TABLE IF NOT EXISTS enquiries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT
-        );
-    `);
+    await db.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
+    await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
+    await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
 
-    // Seed default data if empty
     const exams = await db.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
         const defaultSubjects = JSON.stringify(['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
@@ -48,14 +23,10 @@ async function initDB() {
         const defaultAllow = JSON.stringify({ per_subject: true, per_dept: true, all_subjects: true });
         
         const defaults = [
-            ['1', 'WAEC', 'waec', 'waec-logo.png'],
-            ['2', 'WAEC GCE', 'waecgce', 'waec-logo.png'],
-            ['3', 'NECO', 'neco', 'neco-logo.png'],
-            ['4', 'NECO GCE', 'necogce', 'neco-logo.png'],
-            ['5', 'JAMB', 'jamb', 'jamb-logo.png'],
-            ['6', 'POST UTME', 'postutme', 'putme-logo.png'],
-            ['7', 'JUPEB', 'jupeb', 'jupeb-logo.png'],
-            ['8', 'IJMB', 'ijmb', 'ijmb-logo.png'],
+            ['1', 'WAEC', 'waec', 'waec-logo.png'], ['2', 'WAEC GCE', 'waecgce', 'waec-logo.png'],
+            ['3', 'NECO', 'neco', 'neco-logo.png'], ['4', 'NECO GCE', 'necogce', 'neco-logo.png'],
+            ['5', 'JAMB', 'jamb', 'jamb-logo.png'], ['6', 'POST UTME', 'postutme', 'putme-logo.png'],
+            ['7', 'JUPEB', 'jupeb', 'jupeb-logo.png'], ['8', 'IJMB', 'ijmb', 'ijmb-logo.png'],
             ['9', 'NABTEB', 'nabteb', 'nabteb-logo.png'],
         ];
         
@@ -70,7 +41,6 @@ async function initDB() {
 }
 initDB();
 
-// --- ROUTES ---
 app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
@@ -82,61 +52,34 @@ app.get('/api/exams', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ⚠️ FIXED UPDATE ROUTE ⚠️
 app.put('/api/exams/:id', async (req, res) => {
     try {
         const { prices, allow, subjects } = req.body;
+        let updateParts = []; let args = [];
+        if (prices) { updateParts.push("prices = ?"); args.push(JSON.stringify(prices)); }
+        if (allow) { updateParts.push("allow = ?"); args.push(JSON.stringify(allow)); }
+        if (subjects) { updateParts.push("subjects = ?"); args.push(JSON.stringify(subjects)); }
+        if (updateParts.length === 0) return res.status(400).json({ error: "No data provided" });
         
-        // Build the query dynamically based on what was sent
-        let updateParts = [];
-        let args = [];
-
-        if (prices) {
-            updateParts.push("prices = ?");
-            args.push(JSON.stringify(prices));
-        }
-        if (allow) {
-            updateParts.push("allow = ?");
-            args.push(JSON.stringify(allow));
-        }
-        if (subjects) {
-            updateParts.push("subjects = ?");
-            args.push(JSON.stringify(subjects));
-        }
-
-        if (updateParts.length === 0) {
-            return res.status(400).json({ error: "No data provided to update" });
-        }
-
         args.push(req.params.id);
-        const query = `UPDATE exams SET ${updateParts.join(', ')} WHERE id = ?`;
-        
-        console.log("Executing SQL:", query);
-        await db.execute({ sql: query, args: args });
-        
+        await db.execute({ sql: `UPDATE exams SET ${updateParts.join(', ')} WHERE id = ?`, args: args });
         res.json({ success: true });
-    } catch (err) { 
-        console.error("Update Error:", err);
-        res.status(500).json({ error: err.message }); 
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/pins', async (req, res) => {
     try {
         const { examId, subjects, deviceId, manualPin } = req.body;
         const finalPin = manualPin ? manualPin.toUpperCase() : Math.random().toString(36).substr(2, 6).toUpperCase();
-        
         await db.execute({
             sql: "INSERT INTO pins (pin, examId, subjects, deviceId, date) VALUES (?, ?, ?, ?, ?)",
             args: [finalPin, examId, JSON.stringify(subjects), deviceId, new Date().toISOString()]
         });
         res.json({ success: true, pin: finalPin });
-    } catch (err) { 
-        if(err.message.includes('UNIQUE')) return res.status(400).json({ error: 'This PIN already exists.' });
-        res.status(500).json({ error: err.message }); 
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ⚠️ THE FIX: This now sends the exact data structure the frontend expects
 app.post('/api/pins/verify', async (req, res) => {
     try {
         const { pin, deviceId } = req.body;
@@ -149,18 +92,18 @@ app.post('/api/pins/verify', async (req, res) => {
         const examRes = await db.execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [pinData.examId] });
         const examData = examRes.rows[0];
 
-        res.json({ 
-            success: true, 
-            data: {
-                pin: pinData.pin,
-                subjects: JSON.parse(pinData.subjects),
-                examId: {
-                    _id: examData.id,
-                    name: examData.name,
-                    subjects: JSON.parse(examData.subjects) // This now includes your saved text/images
-                }
-            } 
-        });
+        // Construct the exact object format the frontend needs
+        const responseData = {
+            pin: pinData.pin,
+            subjects: JSON.parse(pinData.subjects),
+            examId: {
+                _id: examData.id,
+                name: examData.name,
+                subjects: JSON.parse(examData.subjects)
+            }
+        };
+
+        res.json({ success: true, data: responseData });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -187,10 +130,7 @@ app.post('/api/enquiries', async (req, res) => {
 });
 
 app.get('/api/enquiries', async (req, res) => {
-    try {
-        const result = await db.execute("SELECT * FROM enquiries ORDER BY date DESC");
-        res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const result = await db.execute("SELECT * FROM enquiries ORDER BY date DESC"); res.json(result.rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = process.env.PORT || 5000;
