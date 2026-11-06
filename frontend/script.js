@@ -1,13 +1,14 @@
-// ⚠️ 1. PUT YOUR LIVE RENDER URL HERE
+// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
-// State variables
 var dbExams = [];
 var currentExam = null;
 var currentPackageType = null;
 var currentPrice = 0;
 
-// --- DEVICE ID LOGIC ---
+// Working placeholder image
+const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
+
 function getDeviceId() {
     var deviceId = localStorage.getItem('sa_device_id');
     if (!deviceId) {
@@ -19,9 +20,7 @@ function getDeviceId() {
 
 function displayDeviceId() {
     var display = document.getElementById('user-device-id-display');
-    if(display) {
-        display.innerText = getDeviceId();
-    }
+    if(display) display.innerText = getDeviceId();
 }
 
 function copyDeviceId() {
@@ -29,20 +28,13 @@ function copyDeviceId() {
     alert('Device ID Copied! Send this to Support on Telegram.');
 }
 
-// --- NAVIGATION ---
 function showPage(pageId) {
     var mains = document.querySelectorAll('main');
-    for(var i=0; i<mains.length; i++) {
-        mains[i].style.display = 'none';
-    }
+    for(var i=0; i<mains.length; i++) mains[i].style.display = 'none';
     document.getElementById('page-' + pageId).style.display = 'block';
-    
-    if(pageId === 'verify') {
-        displayDeviceId();
-    }
+    if(pageId === 'verify') displayDeviceId();
 }
 
-// --- FETCH & RENDER EXAMS ---
 function fetchExams() {
     fetch(API_URL + '/exams', { cache: "no-store" })
     .then(function(response) { return response.json(); })
@@ -67,14 +59,13 @@ function renderExams() {
         card.className = 'exam-card';
         card.onclick = function() { openExamPackages(exam._id); };
         
-        var fallbackImg = 'https://via.placeholder.com/60/001f5b/ffcc00?text=' + exam.name.substring(0,2);
+        var fallbackImg = 'https://placehold.co/60x60/001f5b/ffcc00?text=' + exam.name.substring(0,2);
         card.innerHTML = '<img src="' + (exam.logo || fallbackImg) + '" onerror="this.src=\'' + fallbackImg + '\'">' + 
                          '<h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">' + exam.name + '</h3>';
         grid.appendChild(card);
     });
 }
 
-// --- SHARING ---
 function checkSharedLink() {
     var urlParams = new URLSearchParams(window.location.search);
     var examSlug = urlParams.get('exam');
@@ -90,14 +81,12 @@ function shareExamLink(examSlug) {
     alert('Shareable link copied: ' + url);
 }
 
-// --- PACKAGES & CHECKOUT ---
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
     if (!currentExam) return;
 
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
     
-    // Set share link button
     var shareBtn = document.getElementById('share-link-btn');
     shareBtn.onclick = function() { shareExamLink(currentExam.slug); };
     
@@ -123,7 +112,7 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.per_subject;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'block';
-        previewImg.src = 'https://via.placeholder.com/300x150?text=Select+a+Subject';
+        previewImg.src = PLACEHOLDER;
         
         var html = '';
         currentExam.subjects.forEach(function(sub) {
@@ -161,7 +150,7 @@ function updatePreviewAndLimit(checkbox, max) {
     }
     if (checkbox.checked) {
         var subData = currentExam.subjects.find(function(s) { return s.name === checkbox.value; });
-        document.getElementById('subject-preview-img').src = subData.thumbnail || 'https://via.placeholder.com/300x150?text=No+Preview';
+        document.getElementById('subject-preview-img').src = subData.thumbnail || PLACEHOLDER;
     }
 }
 
@@ -177,7 +166,6 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none'; 
 }
 
-// --- PAYSTACK ---
 function payWithPaystack() {
     var selectedSubjects = [];
     if (currentPackageType !== 'all_subjects') {
@@ -216,7 +204,7 @@ function generatePIN(selectedSubjects) {
     .catch(function() { alert('Error generating PIN.'); });
 }
 
-// --- VERIFY CONTENT ---
+// ⚠️ FIXED VERIFY FUNCTION ⚠️
 function verifyAndShowContent() {
     var inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     var errorMsg = document.getElementById('pin-error');
@@ -245,10 +233,14 @@ function verifyAndShowContent() {
         }
 
         document.getElementById('content-display').style.display = 'block';
-        var examInfo = dbExams.find(function(e) { return e._id === result.data.examId._id; });
+        
+        // SAFELY handle the examId (could be an object or string)
+        var examIdStr = result.data.examId._id ? result.data.examId._id : result.data.examId;
+        var examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
+        
         var contentText = "";
         
-        if (result.data.subjects) {
+        if (result.data.subjects && examInfo) {
             result.data.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData) {
@@ -260,7 +252,7 @@ function verifyAndShowContent() {
         var answersDiv = document.getElementById('actual-answers');
         answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap;">' + contentText + '</pre>';
         
-        if (result.data.subjects) {
+        if (result.data.subjects && examInfo) {
             result.data.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
@@ -280,7 +272,6 @@ function verifyAndShowContent() {
     });
 }
 
-// --- CONTACT FORM ---
 var enquiryForm = document.getElementById('enquiryForm');
 if(enquiryForm) {
     enquiryForm.addEventListener('submit', function(e) {
@@ -306,7 +297,6 @@ if(enquiryForm) {
     });
 }
 
-// Initialize
 window.onload = function() { 
     if(document.getElementById('home-exam-grid')) fetchExams(); 
 };
