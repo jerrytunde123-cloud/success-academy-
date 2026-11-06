@@ -115,7 +115,7 @@ app.post('/api/enquiries', async (req, res) => {
 });
 
 app.get('/api/enquiries', async (req, res) => {
-    try { res.json(await Enquiry.find().sort({ date: -1 })); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { res.json(await Enquiry.find().sort({ date: -1 })); } catch (err) { res.status(500).json({ error: err.message }); }  
 });
 
 const PORT = process.env.PORT || 5000;
