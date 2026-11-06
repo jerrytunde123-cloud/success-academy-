@@ -128,7 +128,7 @@
         </div>
     </div>
 
-        <script>
+    <script>
         window.onload = function() {
             const ADMIN_PASSWORD = "admin123"; 
             const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
@@ -185,7 +185,6 @@
                     select.innerHTML = '<option value="">-- Server sleeping. Refresh page --</option>';
                 }
             }
-
 
             window.loadExamConfig = function() {
                 const id = document.getElementById('exam-select').value;
@@ -311,12 +310,25 @@
             }
 
             async function saveActiveSubjectToDB() {
+                console.log("Attempting to save data to DB...");
                 const updatedSubjects = activeExam.subjects.map(sub => sub.name === activeSubject.name ? activeSubject : sub);
-                await fetch(`${API_URL}/exams/${activeExam._id}`, { 
-                    method: 'PUT', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ subjects: updatedSubjects }) 
-                });
+                
+                try {
+                    const response = await fetch(`${API_URL}/exams/${activeExam._id}`, { 
+                        method: 'PUT', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify({ subjects: updatedSubjects }) 
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error("Server responded with an error: " + response.status);
+                    }
+                    
+                    console.log("Successfully saved to DB!");
+                } catch (error) {
+                    console.error("Failed to save:", error);
+                    alert("Failed to save data to server. Check your internet or backend logs.");
+                }
             }
 
             async function loadPinHistory() {
