@@ -7,6 +7,9 @@ var currentPackageType = null;
 var currentPrice = 0;
 const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
 
+// Ping the server on load to wake it up from Render sleep
+fetch(API_URL + '/exams', { cache: "no-store" }).catch(function() { console.log("Waking server..."); });
+
 function getDeviceId() {
     var deviceId = localStorage.getItem('sa_device_id');
     if (!deviceId) {
@@ -23,7 +26,7 @@ function displayDeviceId() {
 
 function copyDeviceId() {
     navigator.clipboard.writeText(getDeviceId());
-    alert('Device ID Copied!');
+    alert('Device ID Copied! Send this to Support on Telegram.');
 }
 
 function showPage(pageId) {
@@ -40,7 +43,10 @@ function fetchExams() {
         dbExams = data;
         renderExams();
     })
-    .catch(function(error) { console.error("Error fetching exams:", error); });
+    .catch(function(error) { 
+        console.error("Error fetching exams:", error); 
+        document.getElementById('home-exam-grid').innerHTML = '<p style="text-align:center; color:red;">Waking up server, please wait 50 seconds and refresh...</p>';
+    });
 }
 
 function renderExams() {
@@ -62,18 +68,22 @@ function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
     if (!currentExam) return;
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
+    
     var shareBtn = document.getElementById('share-link-btn');
     shareBtn.onclick = function() { 
         var url = window.location.origin + window.location.pathname + '?exam=' + currentExam.slug;
         navigator.clipboard.writeText(url);
         alert('Shareable link copied: ' + url);
     };
+    
     document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
     document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
     document.getElementById('price-all-subjects').innerText = currentExam.prices.all_subjects;
+
     document.getElementById('pkg-per-subject').style.display = currentExam.allow.per_subject ? 'block' : 'none';
     document.getElementById('pkg-per-dept').style.display = currentExam.allow.per_dept ? 'block' : 'none';
     document.getElementById('pkg-all-subjects').style.display = currentExam.allow.all_subjects ? 'block' : 'none';
+
     showPage('packages');
 }
 
@@ -83,6 +93,7 @@ function openCheckout(packageType) {
     var previewImg = document.getElementById('subject-preview-img');
     var subjectArea = document.getElementById('subject-selection-area');
     var subjectCheckboxes = document.getElementById('subject-checkboxes');
+
     if (packageType === 'per_subject') {
         currentPrice = currentExam.prices.per_subject;
         subjectArea.style.display = 'block';
@@ -136,7 +147,8 @@ function payWithPaystack() {
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
     var handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043
+', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -165,10 +177,15 @@ function generatePIN(selectedSubjects) {
 function verifyAndShowContent() {
     var inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     var errorMsg = document.getElementById('pin-error');
-    errorMsg.style.display = 'none';
-    document.getElementById('content-display').style.display = 'none';
-    if(!inputPin) return alert("Please enter a PIN.");
+    var contentDisplay = document.getElementById('content-display');
+    var answersDiv = document.getElementById('actual-answers');
     
+    errorMsg.style.display = 'none';
+    contentDisplay.style.display = 'none';
+    answersDiv.innerHTML = 'Loading... (Waking up server, please wait)'; // Show loading text
+    
+    if(!inputPin) return alert("Please enter a PIN.");
+
     fetch(API_URL + '/pins/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,43 +199,53 @@ function verifyAndShowContent() {
         if (!result.ok) { 
             errorMsg.innerText = result.data.error || 'Invalid PIN'; 
             errorMsg.style.display = 'block'; 
+            contentDisplay.style.display = 'none';
             return; 
         }
-        document.getElementById('content-display').style.display = 'block';
+        
+        contentDisplay.style.display = 'block';
+        
         var examIdStr = "";
         if (result.data.examId) {
             examIdStr = typeof result.data.examId === 'object' ? result.data.examId._id : result.data.examId;
         }
+        
         var examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
+        
+        // If exam not found locally, fetch all exams again
         if (!examInfo && examIdStr) {
             fetch(API_URL + '/exams').then(function(res) { return res.json(); }).then(function(allExams) {
                 dbExams = allExams;
                 examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
-                displayAnswers(result.data, examInfo);
+                renderAnswers(result.data, examInfo, answersDiv);
             });
         } else {
-            displayAnswers(result.data, examInfo);
+            renderAnswers(result.data, examInfo, answersDiv);
         }
     })
     .catch(function(error) { 
         console.error(error);
-        errorMsg.innerText = 'Connection error. Please try again later.'; 
+        errorMsg.innerText = 'Connection error. Server is sleeping. Please wait 50 seconds and try again.'; 
         errorMsg.style.display = 'block'; 
+        contentDisplay.style.display = 'none';
     });
 }
 
-function displayAnswers(pinData, examInfo) {
+function renderAnswers(pinData, examInfo, answersDiv) {
     var contentText = "";
-    var answersDiv = document.getElementById('actual-answers');
+    
     if (pinData.subjects && examInfo) {
         pinData.subjects.forEach(function(subName) {
             var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
             if (subjectData) {
-                contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n' + (subjectData.content || 'No text content yet') + '\n\n';
+                contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n';
+                contentText += (subjectData.content || 'No text content yet') + '\n\n';
             }
         });
     }
-    answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap;">' + contentText + '</pre>';
+    
+    answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px;">' + contentText + '</pre>';
+    
     if (pinData.subjects && examInfo) {
         pinData.subjects.forEach(function(subName) {
             var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
