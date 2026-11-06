@@ -167,7 +167,6 @@ function generatePIN(selectedSubjects) {
     .catch(function() { alert('Error generating PIN.'); });
 }
 
-// ⚠️ FIXED VERIFICATION LOGIC ⚠️
 function verifyAndShowContent() {
     var inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     var errorMsg = document.getElementById('pin-error');
@@ -197,22 +196,24 @@ function verifyAndShowContent() {
         
         contentDisplay.style.display = 'block';
         var pinData = result.data;
-        var examInfo = pinData.examId; // The backend sends the full exam object here
+        var examInfo = pinData.examId; // This is the populated exam object from Turso
 
         var contentText = "";
         
+        // Extract text
         if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
-                if (subjectData) {
+                if (subjectData && subjectData.content) {
                     contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n';
-                    contentText += (subjectData.content || 'No text content yet') + '\n\n';
+                    contentText += subjectData.content + '\n\n';
                 }
             });
         }
         
         answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px;">' + contentText + '</pre>';
         
+        // Extract images
         if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
@@ -226,6 +227,7 @@ function verifyAndShowContent() {
             });
         }
         
+        // Catch-all error if nothing loaded
         if(contentText.trim() === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
             answersDiv.innerHTML = '<p style="color:red;">No content found for this subject. Please contact support.</p>';
         }
