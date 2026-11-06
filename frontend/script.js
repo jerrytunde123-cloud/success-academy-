@@ -234,35 +234,23 @@ function verifyAndShowContent() {
 
         document.getElementById('content-display').style.display = 'block';
         
-        // SAFELY handle the examId (could be an object or string)
-        var examIdStr = result.data.examId._id ? result.data.examId._id : result.data.examId;
-        var examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
-        
-        var contentText = "";
-        
-        if (result.data.subjects && examInfo) {
-            result.data.subjects.forEach(function(subName) {
-                var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
-                if (subjectData) {
-                    contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n' + (subjectData.content || 'No text content yet') + '\n\n';
-                }
-            });
+        // SAFELY find the exam info
+        var examIdStr = "";
+        if (result.data.examId) {
+            examIdStr = typeof result.data.examId === 'object' ? result.data.examId._id : result.data.examId;
         }
         
-        var answersDiv = document.getElementById('actual-answers');
-        answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap;">' + contentText + '</pre>';
+        var examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
         
-        if (result.data.subjects && examInfo) {
-            result.data.subjects.forEach(function(subName) {
-                var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
-                if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
-                    answersDiv.innerHTML += '<h4 style="margin-top:15px; color:var(--primary-blue);">' + subName + ' Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
-                    subjectData.qaImages.forEach(function(imgUrl) {
-                        answersDiv.innerHTML += '<img src="' + imgUrl + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
-                    });
-                    answersDiv.innerHTML += '</div>';
-                }
+        // If the exam isn't in our local list, fetch it directly just in case
+        if (!examInfo && examIdStr) {
+            fetch(API_URL + '/exams').then(function(res) { return res.json(); }).then(function(allExams) {
+                dbExams = allExams;
+                examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
+                displayAnswers(result.data, examInfo);
             });
+        } else {
+            displayAnswers(result.data, examInfo);
         }
     })
     .catch(function(error) { 
@@ -270,6 +258,36 @@ function verifyAndShowContent() {
         errorMsg.innerText = 'Connection error. Please try again later.'; 
         errorMsg.style.display = 'block'; 
     });
+}
+
+// Helper function to display the answers safely
+function displayAnswers(pinData, examInfo) {
+    var contentText = "";
+    var answersDiv = document.getElementById('actual-answers');
+    
+    if (pinData.subjects && examInfo) {
+        pinData.subjects.forEach(function(subName) {
+            var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
+            if (subjectData) {
+                contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n' + (subjectData.content || 'No text content yet') + '\n\n';
+            }
+        });
+    }
+    
+    answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap;">' + contentText + '</pre>';
+    
+    if (pinData.subjects && examInfo) {
+        pinData.subjects.forEach(function(subName) {
+            var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
+            if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
+                answersDiv.innerHTML += '<h4 style="margin-top:15px; color:var(--primary-blue);">' + subName + ' Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
+                subjectData.qaImages.forEach(function(imgUrl) {
+                    answersDiv.innerHTML += '<img src="' + imgUrl + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
+                });
+                answersDiv.innerHTML += '</div>';
+            }
+        });
+    }
 }
 
 var enquiryForm = document.getElementById('enquiryForm');
