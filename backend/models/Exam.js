@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const examSchema = new mongoose.Schema({
     name: { type: String, required: true },
-    slug: { type: String, required: true, unique: true }, // e.g., 'waec', 'necogce'
+    slug: { type: String, required: true, unique: true },
     logo: { type: String },
     prices: {
         per_subject: { type: Number, default: 1000 },
@@ -16,9 +16,9 @@ const examSchema = new mongoose.Schema({
     },
     subjects: [{
         name: String,
-        content: String,       // Text Q&A
-        thumbnail: String,     // ONE public preview image
-        qaImages: [String]     // Multiple private images
+        content: String,
+        thumbnail: String,     // Base64 string for 1 image
+        qaImages: [String]     // Array of Base64 strings
     }]
 });
 
