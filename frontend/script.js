@@ -1,3 +1,4 @@
+// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
 var dbExams = [];
@@ -166,7 +167,7 @@ function generatePIN(selectedSubjects) {
     .catch(function() { alert('Error generating PIN.'); });
 }
 
-// ⚠️ FINAL VERIFICATION LOGIC ⚠️
+// ⚠️ FIXED VERIFICATION LOGIC ⚠️
 function verifyAndShowContent() {
     var inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     var errorMsg = document.getElementById('pin-error');
@@ -174,13 +175,9 @@ function verifyAndShowContent() {
     var answersDiv = document.getElementById('actual-answers');
     
     errorMsg.style.display = 'none';
-    contentDisplay.style.display = 'block';
-    answersDiv.innerHTML = '<p style="color:blue;">Verifying PIN and loading data (wait 5s)...</p>';
-
-    if(!inputPin) {
-        answersDiv.innerHTML = '';
-        return alert("Please enter a PIN.");
-    }
+    contentDisplay.style.display = 'none';
+    
+    if(!inputPin) return alert("Please enter a PIN.");
 
     fetch(API_URL + '/pins/verify', {
         method: 'POST',
@@ -195,17 +192,16 @@ function verifyAndShowContent() {
         if (!result.ok) { 
             errorMsg.innerText = result.data.error || 'Invalid PIN'; 
             errorMsg.style.display = 'block'; 
-            contentDisplay.style.display = 'none';
             return; 
         }
-
-        // The backend sends the fully populated exam object in result.data.examId
+        
+        contentDisplay.style.display = 'block';
         var pinData = result.data;
-        var examInfo = pinData.examId; // This is the full exam object
+        var examInfo = pinData.examId; // The backend sends the full exam object here
 
         var contentText = "";
         
-        if (pinData.subjects && examInfo) {
+        if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData) {
@@ -217,7 +213,7 @@ function verifyAndShowContent() {
         
         answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px;">' + contentText + '</pre>';
         
-        if (pinData.subjects && examInfo) {
+        if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
@@ -230,8 +226,8 @@ function verifyAndShowContent() {
             });
         }
         
-        if(contentText === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
-            answersDiv.innerHTML = '<p style="color:red;">No content found for the selected subjects. Please check the admin panel.</p>';
+        if(contentText.trim() === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
+            answersDiv.innerHTML = '<p style="color:red;">No content found for this subject. Please contact support.</p>';
         }
     })
     .catch(function(error) { 
