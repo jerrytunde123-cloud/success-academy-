@@ -5,7 +5,7 @@ var dbExams = [];
 var currentExam = null;
 var currentPackageType = null;
 var currentPrice = 0;
-const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
+const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Image+Not+Uploaded+Yet';
 
 function getDeviceId() {
     var deviceId = localStorage.getItem('sa_device_id');
@@ -188,9 +188,6 @@ function verifyAndShowContent() {
         return response.json().then(function(data) { return { status: response.status, ok: response.ok, data: data }; });
     })
     .then(function(result) {
-        // Look at this in your browser console to see the exact data
-        console.log("SERVER RESPONSE:", result);
-
         if (!result.ok) { 
             errorMsg.innerText = result.data.error || 'Invalid PIN'; 
             errorMsg.style.display = 'block'; 
@@ -198,8 +195,6 @@ function verifyAndShowContent() {
         }
         
         contentDisplay.style.display = 'block';
-        
-        // Because our backend now sends { success: true, data: { ... } }
         var pinData = result.data.data; 
         var examInfo = pinData.examId; 
 
@@ -217,13 +212,16 @@ function verifyAndShowContent() {
         
         answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px; color:black; font-size:16px;">' + contentText + '</pre>';
         
+        // ⚠️ FIXED IMAGE RENDERING ⚠️
         if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
                     answersDiv.innerHTML += '<h4 style="margin-top:15px; color:var(--primary-blue);">' + subName + ' Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
                     subjectData.qaImages.forEach(function(imgUrl) {
-                        answersDiv.innerHTML += '<img src="' + imgUrl + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
+                        // Ensure we handle Base64 strings properly
+                        var imgSource = imgUrl.startsWith('data:image') ? imgUrl : imgUrl;
+                        answersDiv.innerHTML += '<img src="' + imgSource + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
                     });
                     answersDiv.innerHTML += '</div>';
                 }
