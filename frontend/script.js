@@ -147,8 +147,7 @@ function payWithPaystack() {
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
     var handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043
-', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
