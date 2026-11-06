@@ -74,7 +74,6 @@ initDB();
 app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
-        // Convert 'id' to '_id' so the frontend understands it
         const formatted = result.rows.map(row => ({
             _id: row.id, 
             name: row.name, 
@@ -128,27 +127,24 @@ app.post('/api/pins/verify', async (req, res) => {
     try {
         const { pin, deviceId } = req.body;
         
-        // 1. Verify the PIN exists
         const pinRes = await db.execute({ sql: "SELECT * FROM pins WHERE pin = ?", args: [pin] });
         if (pinRes.rows.length === 0) return res.status(404).json({ error: 'Invalid PIN' });
         
         const pinData = pinRes.rows[0];
         if (pinData.deviceId !== deviceId) return res.status(403).json({ error: 'Fraud Alert: Wrong Device' });
 
-        // 2. Fetch the associated Exam
         const examRes = await db.execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [pinData.examId] });
-        if (examRes.rows.length === 0) return res.status(404).json({ error: 'Exam associated with this PIN was deleted.' });
+        if (examRes.rows.length === 0) return res.status(404).json({ error: 'Exam deleted.' });
         
         const examData = examRes.rows[0];
 
-        // 3. Send back the data formatted exactly how the frontend expects it
         res.json({ 
             success: true, 
             data: {
                 pin: pinData.pin,
                 subjects: JSON.parse(pinData.subjects),
                 examId: {
-                    _id: examData.id, // Map 'id' to '_id'
+                    _id: examData.id, 
                     name: examData.name,
                     subjects: JSON.parse(examData.subjects)
                 }
