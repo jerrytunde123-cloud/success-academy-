@@ -11,14 +11,29 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+// ⚠️ EXPANDED SUBJECT LIST (20+ Subjects) ⚠️
+const FULL_SUBJECT_LIST = [
+    "English Language", "Mathematics", "Biology", "Chemistry", "Physics", 
+    "Economics", "Commerce", "Principles of Accounts", "Literature-in-English", 
+    "Government", "Geography", "History", "Christian Religious Studies", 
+    "Islamic Religious Studies", "Computer Studies", "Agricultural Science", 
+    "Hausa", "Igbo", "Yoruba", "French", "Arabic", "Home Economics", 
+    "Physical and Health Education", "Art", "Music"
+];
+
 async function initDB() {
+    // Drop tables to force a fresh start with the new subject list
+    // (You can remove the DROP lines later once everything is perfect)
+    await db.execute(`DROP TABLE IF EXISTS exams;`);
+    
     await db.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
 
     const exams = await db.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
-        const defaultSubjects = JSON.stringify(['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
+        // Seed with the FULL subject list
+        const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
         const defaultPrices = JSON.stringify({ per_subject: 1000, per_dept: 5000, all_subjects: 8000 });
         const defaultAllow = JSON.stringify({ per_subject: true, per_dept: true, all_subjects: true });
         
@@ -36,7 +51,7 @@ async function initDB() {
                 args: [defaults[i][0], defaults[i][1], defaults[i][2], defaults[i][3], defaultPrices, defaultAllow, defaultSubjects]
             });
         }
-        console.log('Database seeded.');
+        console.log('Database seeded with 25 subjects.');
     }
 }
 initDB();
@@ -79,7 +94,6 @@ app.post('/api/pins', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ⚠️ THE FIX: This now sends the exact data structure the frontend expects
 app.post('/api/pins/verify', async (req, res) => {
     try {
         const { pin, deviceId } = req.body;
@@ -92,18 +106,18 @@ app.post('/api/pins/verify', async (req, res) => {
         const examRes = await db.execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [pinData.examId] });
         const examData = examRes.rows[0];
 
-        // Construct the exact object format the frontend needs
-        const responseData = {
-            pin: pinData.pin,
-            subjects: JSON.parse(pinData.subjects),
-            examId: {
-                _id: examData.id,
-                name: examData.name,
-                subjects: JSON.parse(examData.subjects)
-            }
-        };
-
-        res.json({ success: true, data: responseData });
+        res.json({ 
+            success: true, 
+            data: {
+                pin: pinData.pin,
+                subjects: JSON.parse(pinData.subjects),
+                examId: {
+                    _id: examData.id,
+                    name: examData.name,
+                    subjects: JSON.parse(examData.subjects)
+                }
+            } 
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
