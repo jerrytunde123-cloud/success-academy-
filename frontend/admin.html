@@ -128,11 +128,15 @@
         </div>
     </div>
 
-        <script>
+    <script>
         window.onload = function() {
             const ADMIN_PASSWORD = "admin123"; 
             const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
             
+            emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
+            const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
+            const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+
             let exams = [];
             let activeExam = null;
             let activeSubject = null;
@@ -248,11 +252,28 @@
                 alert('Prices Updated!');
             }
 
+            // ⚠️ IMAGE COMPRESSION LOGIC TO PREVENT RENDER CRASH ⚠️
             function getBase64(file) {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.readAsDataURL(file);
-                    reader.onload = () => resolve(reader.result);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.src = event.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800; // Resize to max 800px wide
+                            const scaleSize = MAX_WIDTH / img.width;
+                            canvas.width = MAX_WIDTH;
+                            canvas.height = img.height * scaleSize;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            
+                            // Compress to JPEG with 0.6 quality (Reduces file size by ~90%)
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                            resolve(dataUrl);
+                        };
+                    };
                     reader.onerror = error => reject(error);
                 });
             }
@@ -295,13 +316,9 @@
                 alert('Text Answers Saved!');
             }
 
-            // ⚠️ FIXED SAVE FUNCTION ⚠️
             async function saveActiveSubjectToDB() {
                 console.log("Sending to DB:", activeSubject);
-                
-                const payload = {
-                    subjects: activeExam.subjects
-                };
+                const payload = { subjects: activeExam.subjects };
 
                 try {
                     const response = await fetch(`${API_URL}/exams/${activeExam._id}`, { 
@@ -314,7 +331,6 @@
                         const errData = await response.json();
                         throw new Error(errData.error || "Failed to update");
                     }
-                    
                     console.log("Successfully saved to DB!");
                 } catch (error) {
                     console.error("Failed to save:", error);
@@ -322,8 +338,6 @@
                 }
             }
 
-            // ... (Keep loadPinHistory, loadManualSubjects, generateManualPin, loadEnquiries, openReply, sendEmailReply exactly as they were)
-            
             async function loadPinHistory() {
                 const res = await fetch(`${API_URL}/admin/pins`, { cache: "no-store" });
                 const pins = await res.json();
