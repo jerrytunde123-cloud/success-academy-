@@ -34,20 +34,17 @@
 </head>
 <body>
 
-    <!-- LOGIN SCREEN -->
     <div id="login-screen" class="login-box">
         <h2 style="color:#001f5b;">Admin Login</h2>
-        <p>Enter password to access the dashboard.</p>
         <input type="password" id="admin-password" placeholder="Enter Password">
         <button class="save-btn" style="width:100%;" onclick="checkPassword()">Login</button>
         <p id="login-error" style="color:red; display:none; margin-top:10px;">Incorrect Password!</p>
     </div>
 
-    <!-- MAIN DASHBOARD -->
     <div id="dashboard" class="container">
         <div class="header">
             <h1>Admin Dashboard</h1>
-            <button onclick="logout()" style="background:#ff4444; color:white; padding:10px; text-decoration:none; border-radius:5px; border:none; cursor:pointer;">Log Out</button>
+            <button onclick="logout()" style="background:#ff4444; color:white; padding:10px; border-radius:5px; border:none; cursor:pointer;">Log Out</button>
         </div>
 
         <div class="tabs">
@@ -56,7 +53,6 @@
             <button class="tab" onclick="switchTab('enquiries', event)">Enquiries</button>
         </div>
 
-        <!-- EXAMS TAB -->
         <div id="tab-exams" class="section active">
             <select id="exam-select" onchange="loadExamConfig()">
                 <option value="">-- Select Exam --</option>
@@ -97,18 +93,15 @@
             </div>
         </div>
 
-        <!-- PINS TAB -->
         <div id="tab-pins" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3>Generate Manual PIN</h3>
-                <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Use this if a user lost their PIN. Ask them for their "Device ID" (visible on the Verify Page).</p>
                 <div class="row"><select id="manual-exam-select" onchange="loadManualSubjects()"></select></div>
                 <div class="row"><input type="text" id="manual-device-id" placeholder="Enter User's Device ID (e.g., DEV-ABC123)"></div>
                 <div class="row"><input type="text" id="manual-pin-input" placeholder="Enter Custom PIN (e.g. ABC123)"></div>
                 <div id="manual-subjects-area" style="max-height: 100px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:10px; background:#fff; border-radius:5px;"></div>
                 <button class="save-btn" onclick="generateManualPin()">Generate PIN</button>
             </div>
-
             <h3>All Purchased PINs</h3>
             <table>
                 <thead><tr><th>Date</th><th>Exam</th><th>PIN</th><th>Device ID</th><th>Subjects</th></tr></thead>
@@ -116,7 +109,6 @@
             </table>
         </div>
 
-        <!-- ENQUIRIES TAB -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
@@ -126,7 +118,6 @@
         </div>
     </div>
 
-    <!-- REPLY MODAL -->
     <div id="reply-modal" class="modal">
         <div class="modal-content">
             <h3>Reply to <span id="reply-name"></span></h3>
@@ -138,13 +129,10 @@
     </div>
 
     <script>
-        // Use window.onload to ensure all HTML elements are loaded before running script
         window.onload = function() {
-            // ⚠️ CONFIGURATIONS
             const ADMIN_PASSWORD = "admin123"; 
-            const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; // Replace with your Render URL if different
+            const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
             
-            // ⚠️ EMAILJS CONFIG
             emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
             const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
             const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
@@ -154,10 +142,8 @@
             let activeSubject = null;
             let currentReplyData = null;
 
-            // Make functions globally accessible for inline HTML onclick handlers
             window.checkPassword = function() {
-                const input = document.getElementById('admin-password').value;
-                if(input === ADMIN_PASSWORD) {
+                if(document.getElementById('admin-password').value === ADMIN_PASSWORD) {
                     localStorage.setItem('sa_admin_logged_in', 'true');
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('dashboard').style.display = 'block';
@@ -185,17 +171,14 @@
                 try {
                     const res = await fetch(`${API_URL}/exams`, { cache: "no-store" });
                     exams = await res.json();
-                    
                     const select = document.getElementById('exam-select');
                     select.innerHTML = '<option value="">-- Select Exam --</option>';
                     exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
-
                     const manualSelect = document.getElementById('manual-exam-select');
                     manualSelect.innerHTML = '';
                     exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
                     loadManualSubjects();
-
-                } catch (e) { alert("Failed to connect to backend. Check console for details."); }
+                } catch (e) { alert("Failed to connect to backend."); }
             }
 
             window.loadExamConfig = function() {
@@ -222,7 +205,6 @@
             window.loadSubjectData = function() {
                 const subName = document.getElementById('subject-select').value;
                 activeSubject = activeExam.subjects.find(s => s.name === subName);
-                
                 document.getElementById('content-input').value = activeSubject.content || '';
                 
                 const thumbPreview = document.getElementById('thumbnail-preview');
@@ -235,7 +217,6 @@
                 const gallery = document.getElementById('qa-gallery');
                 gallery.innerHTML = '';
                 const images = activeSubject.qaImages || [];
-                
                 if(images.length === 0) {
                     gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images uploaded yet.</p>';
                 } else {
@@ -243,7 +224,7 @@
                         gallery.innerHTML += `
                             <div class="image-thumbnail">
                                 <img src="${imgUrl}" alt="QA">
-                                <button class="delete-img-btn" onclick="removeQAImage(${index})" title="Delete Image">×</button>
+                                <button class="delete-img-btn" onclick="removeQAImage(${index})">×</button>
                             </div>
                         `;
                     });
@@ -271,57 +252,57 @@
                     }
                 };
                 await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
-                alert('Prices Updated! Refresh the main website to see changes.');
+                alert('Prices Updated!');
+            }
+
+            // Convert file to Base64
+            function getBase64(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = error => reject(error);
+                });
             }
 
             window.uploadThumbnail = async function() {
                 const fileInput = document.getElementById('thumbnail-upload');
                 if (fileInput.files.length === 0) return alert('Select an image first.');
-
-                const formData = new FormData();
-                formData.append('image', fileInput.files[0]);
-
                 try {
-                    const res = await fetch(`${API_URL}/upload/thumbnail`, { method: 'POST', body: formData });
-                    const data = await res.json();
-                    if(data.imageUrl) {
-                        activeSubject.thumbnail = data.imageUrl;
-                        await saveActiveSubjectToDB();
-                        alert('Thumbnail Uploaded!');
-                        fileInput.value = '';
-                        loadSubjectData();
-                    }
+                    const base64Img = await getBase64(fileInput.files[0]);
+                    activeSubject.thumbnail = base64Img;
+                    await saveActiveSubjectToDB();
+                    alert('Thumbnail Uploaded!');
+                    fileInput.value = '';
+                    loadSubjectData();
                 } catch (e) { alert('Failed to upload thumbnail.'); }
             }
 
             window.uploadQAImages = async function() {
                 const fileInput = document.getElementById('qa-upload');
                 if (fileInput.files.length === 0) return alert('Select images first.');
-                if (fileInput.files.length > 5) return alert('You can only upload up to 5 images at once.');
-
+                
                 let currentQA = activeSubject.qaImages || [];
-                if(currentQA.length + fileInput.files.length > 25) return alert('Max 25 Q&A images allowed per subject.');
-
-                const formData = new FormData();
-                for(let i=0; i<fileInput.files.length; i++) formData.append('images', fileInput.files[i]);
+                if(currentQA.length + fileInput.files.length > 25) return alert('Max 25 Q&A images allowed.');
 
                 try {
-                    const res = await fetch(`${API_URL}/upload/qa`, { method: 'POST', body: formData });
-                    const data = await res.json();
-                    if(data.imageUrls) {
-                        activeSubject.qaImages = [...currentQA, ...data.imageUrls];
-                        await saveActiveSubjectToDB();
-                        alert('Q&A Images Uploaded!');
-                        fileInput.value = '';
-                        loadSubjectData();
+                    let newBase64Images = [];
+                    for(let i=0; i<fileInput.files.length; i++) {
+                        const b64 = await getBase64(fileInput.files[i]);
+                        newBase64Images.push(b64);
                     }
+                    activeSubject.qaImages = [...currentQA, ...newBase64Images];
+                    await saveActiveSubjectToDB();
+                    alert('Q&A Images Uploaded!');
+                    fileInput.value = '';
+                    loadSubjectData();
                 } catch (e) { alert('Failed to upload Q&A images.'); }
             }
 
             window.saveTextContent = async function() {
                 activeSubject.content = document.getElementById('content-input').value;
                 await saveActiveSubjectToDB();
-                alert('Text Answers Saved! Refresh the main website to see changes.');
+                alert('Text Answers Saved!');
             }
 
             async function saveActiveSubjectToDB() {
@@ -369,9 +350,9 @@
                 const checked = document.querySelectorAll('input[name="manual-sub"]:checked');
                 const subjects = Array.from(checked).map(cb => cb.value);
 
-                if(!deviceId) return alert('Device ID is required so the user can access it.');
+                if(!deviceId) return alert('Device ID is required.');
                 if(subjects.length === 0) return alert('Select at least one subject.');
-                if(!customPin) return alert('Enter a custom PIN (e.g., ABC123).');
+                if(!customPin) return alert('Enter a custom PIN.');
 
                 try {
                     const res = await fetch(`${API_URL}/pins`, {
@@ -435,7 +416,6 @@
                 }
             }
 
-            // Check if already logged in on load
             if(localStorage.getItem('sa_admin_logged_in') === 'true') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
