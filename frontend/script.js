@@ -1,6 +1,7 @@
+// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
-// --- WAKE UP SERVER ON LOAD ---
+// Wakes up the server on page load
 fetch(API_URL + '/ping').catch(() => console.log("Waking server..."));
 
 var dbExams = [];
@@ -37,6 +38,7 @@ function showPage(pageId) {
 
 function fetchExams() {
     var grid = document.getElementById('home-exam-grid');
+    if(!grid) return;
     grid.innerHTML = '<p style="text-align:center; color:blue;">Waking up server... Please wait up to 50 seconds.</p>';
     
     fetch(API_URL + '/exams', { cache: "no-store" })
@@ -186,7 +188,7 @@ function verifyAndShowContent() {
     
     errorMsg.style.display = 'none';
     contentDisplay.style.display = 'block';
-    answersDiv.innerHTML = '<p style="color:blue;">Verifying (Server might be waking up, please wait 50s)...</p>';
+    answersDiv.innerHTML = '<p style="color:blue;">Verifying PIN...</p>';
 
     if(!inputPin) {
         answersDiv.innerHTML = '';
@@ -240,12 +242,12 @@ function verifyAndShowContent() {
         }
         
         if(contentText === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
-            answersDiv.innerHTML = '<p style="color:red;">No content found for the selected subjects. Please save data in the Admin panel.</p>';
+            answersDiv.innerHTML = '<p style="color:red;">No content found. Please upload content in Admin Panel.</p>';
         }
     })
     .catch(function(error) { 
         console.error(error);
-        errorMsg.innerText = 'Connection error. Server is likely asleep. Please wait 1 minute and try again.'; 
+        errorMsg.innerText = 'Connection error.'; 
         errorMsg.style.display = 'block'; 
         answersDiv.innerHTML = '';
     });
