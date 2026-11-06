@@ -128,7 +128,7 @@
         </div>
     </div>
 
-    <script>
+        <script>
         window.onload = function() {
             const ADMIN_PASSWORD = "admin123"; 
             const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
@@ -168,18 +168,24 @@
             };
 
             async function initDashboard() {
+                var select = document.getElementById('exam-select');
+                select.innerHTML = '<option value="">-- Waking up server, please wait... --</option>';
+                
                 try {
                     const res = await fetch(`${API_URL}/exams`, { cache: "no-store" });
                     exams = await res.json();
-                    const select = document.getElementById('exam-select');
                     select.innerHTML = '<option value="">-- Select Exam --</option>';
                     exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
+                    
                     const manualSelect = document.getElementById('manual-exam-select');
                     manualSelect.innerHTML = '';
                     exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
                     loadManualSubjects();
-                } catch (e) { alert("Failed to connect to backend."); }
+                } catch (e) { 
+                    select.innerHTML = '<option value="">-- Server sleeping. Refresh page --</option>';
+                }
             }
+
 
             window.loadExamConfig = function() {
                 const id = document.getElementById('exam-select').value;
