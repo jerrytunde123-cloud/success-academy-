@@ -23,7 +23,7 @@ function displayDeviceId() {
 
 function copyDeviceId() {
     navigator.clipboard.writeText(getDeviceId());
-    alert('Device ID Copied! Send this to Support on Telegram.');
+    alert('Device ID Copied!');
 }
 
 function showPage(pageId) {
@@ -188,6 +188,9 @@ function verifyAndShowContent() {
         return response.json().then(function(data) { return { status: response.status, ok: response.ok, data: data }; });
     })
     .then(function(result) {
+        // Look at this in your browser console to see the exact data
+        console.log("SERVER RESPONSE:", result);
+
         if (!result.ok) { 
             errorMsg.innerText = result.data.error || 'Invalid PIN'; 
             errorMsg.style.display = 'block'; 
@@ -195,12 +198,13 @@ function verifyAndShowContent() {
         }
         
         contentDisplay.style.display = 'block';
-        var pinData = result.data;
-        var examInfo = pinData.examId; // This is the populated exam object from Turso
+        
+        // Because our backend now sends { success: true, data: { ... } }
+        var pinData = result.data.data; 
+        var examInfo = pinData.examId; 
 
         var contentText = "";
         
-        // Extract text
         if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
@@ -211,9 +215,8 @@ function verifyAndShowContent() {
             });
         }
         
-        answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px;">' + contentText + '</pre>';
+        answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px; color:black; font-size:16px;">' + contentText + '</pre>';
         
-        // Extract images
         if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
@@ -227,9 +230,8 @@ function verifyAndShowContent() {
             });
         }
         
-        // Catch-all error if nothing loaded
         if(contentText.trim() === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
-            answersDiv.innerHTML = '<p style="color:red;">No content found for this subject. Please contact support.</p>';
+            answersDiv.innerHTML = '<p style="color:red;">No content found. Please contact support.</p>';
         }
     })
     .catch(function(error) { 
