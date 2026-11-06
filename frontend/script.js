@@ -1,4 +1,3 @@
-// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
 var dbExams = [];
@@ -6,9 +5,6 @@ var currentExam = null;
 var currentPackageType = null;
 var currentPrice = 0;
 const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
-
-// Ping the server on load to wake it up from Render sleep
-fetch(API_URL + '/exams', { cache: "no-store" }).catch(function() { console.log("Waking server..."); });
 
 function getDeviceId() {
     var deviceId = localStorage.getItem('sa_device_id');
@@ -43,10 +39,7 @@ function fetchExams() {
         dbExams = data;
         renderExams();
     })
-    .catch(function(error) { 
-        console.error("Error fetching exams:", error); 
-        document.getElementById('home-exam-grid').innerHTML = '<p style="text-align:center; color:red;">Waking up server, please wait 50 seconds and refresh...</p>';
-    });
+    .catch(function(error) { console.error("Error fetching exams:", error); });
 }
 
 function renderExams() {
@@ -147,7 +140,7 @@ function payWithPaystack() {
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
     var handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', 
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -173,6 +166,7 @@ function generatePIN(selectedSubjects) {
     .catch(function() { alert('Error generating PIN.'); });
 }
 
+// ⚠️ FINAL VERIFICATION LOGIC ⚠️
 function verifyAndShowContent() {
     var inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     var errorMsg = document.getElementById('pin-error');
@@ -180,10 +174,13 @@ function verifyAndShowContent() {
     var answersDiv = document.getElementById('actual-answers');
     
     errorMsg.style.display = 'none';
-    contentDisplay.style.display = 'none';
-    answersDiv.innerHTML = 'Loading... (Waking up server, please wait)'; // Show loading text
-    
-    if(!inputPin) return alert("Please enter a PIN.");
+    contentDisplay.style.display = 'block';
+    answersDiv.innerHTML = '<p style="color:blue;">Verifying PIN and loading data (wait 5s)...</p>';
+
+    if(!inputPin) {
+        answersDiv.innerHTML = '';
+        return alert("Please enter a PIN.");
+    }
 
     fetch(API_URL + '/pins/verify', {
         method: 'POST',
@@ -201,62 +198,48 @@ function verifyAndShowContent() {
             contentDisplay.style.display = 'none';
             return; 
         }
+
+        // The backend sends the fully populated exam object in result.data.examId
+        var pinData = result.data;
+        var examInfo = pinData.examId; // This is the full exam object
+
+        var contentText = "";
         
-        contentDisplay.style.display = 'block';
-        
-        var examIdStr = "";
-        if (result.data.examId) {
-            examIdStr = typeof result.data.examId === 'object' ? result.data.examId._id : result.data.examId;
+        if (pinData.subjects && examInfo) {
+            pinData.subjects.forEach(function(subName) {
+                var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
+                if (subjectData) {
+                    contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n';
+                    contentText += (subjectData.content || 'No text content yet') + '\n\n';
+                }
+            });
         }
         
-        var examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
+        answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px;">' + contentText + '</pre>';
         
-        // If exam not found locally, fetch all exams again
-        if (!examInfo && examIdStr) {
-            fetch(API_URL + '/exams').then(function(res) { return res.json(); }).then(function(allExams) {
-                dbExams = allExams;
-                examInfo = dbExams.find(function(e) { return e._id === examIdStr; });
-                renderAnswers(result.data, examInfo, answersDiv);
+        if (pinData.subjects && examInfo) {
+            pinData.subjects.forEach(function(subName) {
+                var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
+                if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
+                    answersDiv.innerHTML += '<h4 style="margin-top:15px; color:var(--primary-blue);">' + subName + ' Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
+                    subjectData.qaImages.forEach(function(imgUrl) {
+                        answersDiv.innerHTML += '<img src="' + imgUrl + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
+                    });
+                    answersDiv.innerHTML += '</div>';
+                }
             });
-        } else {
-            renderAnswers(result.data, examInfo, answersDiv);
+        }
+        
+        if(contentText === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
+            answersDiv.innerHTML = '<p style="color:red;">No content found for the selected subjects. Please check the admin panel.</p>';
         }
     })
     .catch(function(error) { 
         console.error(error);
-        errorMsg.innerText = 'Connection error. Server is sleeping. Please wait 50 seconds and try again.'; 
+        errorMsg.innerText = 'Connection error. Please try again later.'; 
         errorMsg.style.display = 'block'; 
         contentDisplay.style.display = 'none';
     });
-}
-
-function renderAnswers(pinData, examInfo, answersDiv) {
-    var contentText = "";
-    
-    if (pinData.subjects && examInfo) {
-        pinData.subjects.forEach(function(subName) {
-            var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
-            if (subjectData) {
-                contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n';
-                contentText += (subjectData.content || 'No text content yet') + '\n\n';
-            }
-        });
-    }
-    
-    answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px;">' + contentText + '</pre>';
-    
-    if (pinData.subjects && examInfo) {
-        pinData.subjects.forEach(function(subName) {
-            var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
-            if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
-                answersDiv.innerHTML += '<h4 style="margin-top:15px; color:var(--primary-blue);">' + subName + ' Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
-                subjectData.qaImages.forEach(function(imgUrl) {
-                    answersDiv.innerHTML += '<img src="' + imgUrl + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
-                });
-                answersDiv.innerHTML += '</div>';
-            }
-        });
-    }
 }
 
 var enquiryForm = document.getElementById('enquiryForm');
