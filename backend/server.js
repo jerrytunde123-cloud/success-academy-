@@ -82,24 +82,43 @@ app.get('/api/exams', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ⚠️ FIXED UPDATE ROUTE ⚠️
 app.put('/api/exams/:id', async (req, res) => {
     try {
         const { prices, allow, subjects } = req.body;
-        const fields = [];
-        const args = [];
         
-        if (prices) { fields.push("prices = ?"); args.push(JSON.stringify(prices)); }
-        if (allow) { fields.push("allow = ?"); args.push(JSON.stringify(allow)); }
-        if (subjects) { fields.push("subjects = ?"); args.push(JSON.stringify(subjects)); }
-        
+        // Build the query dynamically based on what was sent
+        let updateParts = [];
+        let args = [];
+
+        if (prices) {
+            updateParts.push("prices = ?");
+            args.push(JSON.stringify(prices));
+        }
+        if (allow) {
+            updateParts.push("allow = ?");
+            args.push(JSON.stringify(allow));
+        }
+        if (subjects) {
+            updateParts.push("subjects = ?");
+            args.push(JSON.stringify(subjects));
+        }
+
+        if (updateParts.length === 0) {
+            return res.status(400).json({ error: "No data provided to update" });
+        }
+
         args.push(req.params.id);
+        const query = `UPDATE exams SET ${updateParts.join(', ')} WHERE id = ?`;
         
-        await db.execute({
-            sql: `UPDATE exams SET ${fields.join(', ')} WHERE id = ?`,
-            args: args
-        });
+        console.log("Executing SQL:", query);
+        await db.execute({ sql: query, args: args });
+        
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error("Update Error:", err);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 app.post('/api/pins', async (req, res) => {
@@ -138,7 +157,7 @@ app.post('/api/pins/verify', async (req, res) => {
                 examId: {
                     _id: examData.id,
                     name: examData.name,
-                    subjects: JSON.parse(examData.subjects)
+                    subjects: JSON.parse(examData.subjects) // This now includes your saved text/images
                 }
             } 
         });
