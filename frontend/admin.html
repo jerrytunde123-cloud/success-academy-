@@ -128,15 +128,11 @@
         </div>
     </div>
 
-    <script>
+        <script>
         window.onload = function() {
             const ADMIN_PASSWORD = "admin123"; 
-            const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
+            const API_URL = 'https://success-academy-backend-mhio.onrender.com/api'; 
             
-            emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
-            const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
-            const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
-
             let exams = [];
             let activeExam = null;
             let activeSubject = null;
@@ -169,8 +165,7 @@
 
             async function initDashboard() {
                 var select = document.getElementById('exam-select');
-                select.innerHTML = '<option value="">-- Waking up server, please wait... --</option>';
-                
+                select.innerHTML = '<option value="">-- Waking up server... --</option>';
                 try {
                     const res = await fetch(`${API_URL}/exams`, { cache: "no-store" });
                     exams = await res.json();
@@ -181,9 +176,7 @@
                     manualSelect.innerHTML = '';
                     exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
                     loadManualSubjects();
-                } catch (e) { 
-                    select.innerHTML = '<option value="">-- Server sleeping. Refresh page --</option>';
-                }
+                } catch (e) { select.innerHTML = '<option value="">-- Server Error --</option>'; }
             }
 
             window.loadExamConfig = function() {
@@ -214,24 +207,19 @@
                 
                 const thumbPreview = document.getElementById('thumbnail-preview');
                 if(activeSubject.thumbnail) {
-                    thumbPreview.innerHTML = `<img src="${activeSubject.thumbnail}" style="width:100px; height:100px; object-fit:cover; border-radius:5px; border:1px solid #ccc;">`;
+                    thumbPreview.innerHTML = `<img src="${activeSubject.thumbnail}" style="width:100px; height:100px; object-fit:cover; border-radius:5px;">`;
                 } else {
-                    thumbPreview.innerHTML = `<p style="font-size:12px; color:#666;">No thumbnail uploaded.</p>`;
+                    thumbPreview.innerHTML = `<p style="font-size:12px; color:#666;">No thumbnail.</p>`;
                 }
 
                 const gallery = document.getElementById('qa-gallery');
                 gallery.innerHTML = '';
                 const images = activeSubject.qaImages || [];
                 if(images.length === 0) {
-                    gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images uploaded yet.</p>';
+                    gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images.</p>';
                 } else {
                     images.forEach((imgUrl, index) => {
-                        gallery.innerHTML += `
-                            <div class="image-thumbnail">
-                                <img src="${imgUrl}" alt="QA">
-                                <button class="delete-img-btn" onclick="removeQAImage(${index})">×</button>
-                            </div>
-                        `;
+                        gallery.innerHTML += `<div class="image-thumbnail"><img src="${imgUrl}"><button class="delete-img-btn" onclick="removeQAImage(${index})">×</button></div>`;
                     });
                 }
             }
@@ -279,16 +267,14 @@
                     alert('Thumbnail Uploaded!');
                     fileInput.value = '';
                     loadSubjectData();
-                } catch (e) { alert('Failed to upload thumbnail.'); }
+                } catch (e) { alert('Failed: ' + e.message); }
             }
 
             window.uploadQAImages = async function() {
                 const fileInput = document.getElementById('qa-upload');
                 if (fileInput.files.length === 0) return alert('Select images first.');
-                
                 let currentQA = activeSubject.qaImages || [];
-                if(currentQA.length + fileInput.files.length > 25) return alert('Max 25 Q&A images allowed.');
-
+                if(currentQA.length + fileInput.files.length > 25) return alert('Max 25 images.');
                 try {
                     let newBase64Images = [];
                     for(let i=0; i<fileInput.files.length; i++) {
@@ -300,7 +286,7 @@
                     alert('Q&A Images Uploaded!');
                     fileInput.value = '';
                     loadSubjectData();
-                } catch (e) { alert('Failed to upload Q&A images.'); }
+                } catch (e) { alert('Failed: ' + e.message); }
             }
 
             window.saveTextContent = async function() {
@@ -309,43 +295,42 @@
                 alert('Text Answers Saved!');
             }
 
+            // ⚠️ FIXED SAVE FUNCTION ⚠️
             async function saveActiveSubjectToDB() {
-                console.log("Attempting to save data to DB...");
-                const updatedSubjects = activeExam.subjects.map(sub => sub.name === activeSubject.name ? activeSubject : sub);
+                console.log("Sending to DB:", activeSubject);
                 
+                const payload = {
+                    subjects: activeExam.subjects
+                };
+
                 try {
                     const response = await fetch(`${API_URL}/exams/${activeExam._id}`, { 
                         method: 'PUT', 
                         headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify({ subjects: updatedSubjects }) 
+                        body: JSON.stringify(payload) 
                     });
                     
                     if (!response.ok) {
-                        throw new Error("Server responded with an error: " + response.status);
+                        const errData = await response.json();
+                        throw new Error(errData.error || "Failed to update");
                     }
                     
                     console.log("Successfully saved to DB!");
                 } catch (error) {
                     console.error("Failed to save:", error);
-                    alert("Failed to save data to server. Check your internet or backend logs.");
+                    alert("Failed to save to server: " + error.message);
                 }
             }
 
+            // ... (Keep loadPinHistory, loadManualSubjects, generateManualPin, loadEnquiries, openReply, sendEmailReply exactly as they were)
+            
             async function loadPinHistory() {
                 const res = await fetch(`${API_URL}/admin/pins`, { cache: "no-store" });
                 const pins = await res.json();
                 const tbody = document.getElementById('pins-table-body');
                 tbody.innerHTML = '';
                 pins.forEach(p => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${new Date(p.date).toLocaleDateString()}</td>
-                            <td>${p.examId ? p.examId.name : 'Deleted Exam'}</td>
-                            <td style="font-weight:bold; color:green;">${p.pin}</td>
-                            <td><code>${p.deviceId}</code></td>
-                            <td>${p.subjects.join(', ')}</td>
-                        </tr>
-                    `;
+                    tbody.innerHTML += `<tr><td>${new Date(p.date).toLocaleDateString()}</td><td>${p.examId ? p.examId.name : 'Unknown'}</td><td style="font-weight:bold; color:green;">${p.pin}</td><td><code>${p.deviceId}</code></td><td>${p.subjects.join(', ')}</td></tr>`;
                 });
             }
 
@@ -393,17 +378,7 @@
                 const tbody = document.getElementById('enquiry-table-body');
                 tbody.innerHTML = '';
                 enquiries.forEach(enq => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${new Date(enq.date).toLocaleDateString()}</td>
-                            <td>${enq.name}</td>
-                            <td>${enq.phone}</td>
-                            <td>${enq.email}</td>
-                            <td>${enq.exam}</td>
-                            <td>${enq.message}</td>
-                            <td><button class="btn-reply" onclick="openReply('${enq.name}','${enq.email}')">Reply</button></td>
-                        </tr>
-                    `;
+                    tbody.innerHTML += `<tr><td>${new Date(enq.date).toLocaleDateString()}</td><td>${enq.name}</td><td>${enq.phone}</td><td>${enq.email}</td><td>${enq.exam}</td><td>${enq.message}</td><td><button class="btn-reply" onclick="openReply('${enq.name}','${enq.email}')">Reply</button></td></tr>`;
                 });
             }
 
