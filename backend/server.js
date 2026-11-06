@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); 
 
-// Verify Environment Variables are set
+console.log("--- STARTING SERVER ---");
 console.log("TURSO URL exists:", !!process.env.TURSO_DATABASE_URL);
 console.log("TURSO TOKEN exists:", !!process.env.TURSO_AUTH_TOKEN);
 
@@ -17,12 +17,14 @@ const db = createClient({
 
 app.get('/api/ping', (req, res) => res.send('awake'));
 
-// Initialize Database Tables Safely
+// Initialize Database Tables
 async function initDB() {
+    console.log("--- ATTEMPTING TO CONNECT TO TURSO ---");
     try {
         await db.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
         await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
         await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
+        console.log("--- TABLES CREATED/VERIFIED ---");
 
         const exams = await db.execute("SELECT * FROM exams");
         if (exams.rows.length === 0) {
@@ -45,12 +47,13 @@ async function initDB() {
                     args: [defaults[i][0], defaults[i][1], defaults[i][2], defaults[i][3], defaultPrices, defaultAllow, defaultSubjects]
                 });
             }
-            console.log('Database seeded.');
+            console.log('--- DATABASE SEEDED SUCCESSFULLY ---');
         } else {
-            console.log('Database already has data.');
+            console.log('--- DATABASE ALREADY HAS DATA ---');
         }
     } catch (err) {
-        console.error("DATABASE ERROR DURING INIT:", err.message);
+        console.error("!!! TURSO CONNECTION ERROR !!!");
+        console.error(err.message); // This will show us the exact error
     }
 }
 initDB();
@@ -147,12 +150,6 @@ app.get('/api/enquiries', async (req, res) => {
         const result = await db.execute("SELECT * FROM enquiries ORDER BY date DESC");
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Global Error Handler to prevent crashes
-app.use((err, req, res, next) => {
-    console.error("Global Error:", err.message);
-    res.status(500).json({ error: "Internal Server Error" });
 });
 
 const PORT = process.env.PORT || 5000;
