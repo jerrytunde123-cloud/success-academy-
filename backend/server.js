@@ -7,10 +7,11 @@ const Enquiry = require('./models/Enquiry');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increase limit for Base64 images
+// Increased limit to handle Base64 images
+app.use(express.json({ limit: '50mb' })); 
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Wjh7YkO58X901Q9p>@cluster.f4jypw9.mongodb.net/';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:Wjh7YkO58X901Q9p@cluster.f4jypw9.mongodb.net/success_academy?retryWrites=true&w=majority';
 
 mongoose.connect(MONGO_URI)
 .then(async () => {
@@ -56,12 +57,16 @@ app.post('/api/pins', async (req, res) => {
     }
 });
 
+// ⚠️ CRITICAL FIX: This route now always returns the full populated Exam object
 app.post('/api/pins/verify', async (req, res) => {
     try {
         const { pin, deviceId } = req.body;
         const pinData = await Pin.findOne({ pin: pin }).populate('examId');
+        
         if (!pinData) return res.status(404).json({ error: 'Invalid PIN' });
         if (pinData.deviceId !== deviceId) return res.status(403).json({ error: 'Fraud Alert: Wrong Device' });
+        
+        // Send back the pin data along with the fully populated exam
         res.json({ success: true, data: pinData });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
