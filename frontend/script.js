@@ -23,7 +23,7 @@ function displayDeviceId() {
 
 function copyDeviceId() {
     navigator.clipboard.writeText(getDeviceId());
-    alert('Device ID Copied! Send this to Support on Telegram.');
+    alert('Device ID Copied!');
 }
 
 function showPage(pageId) {
@@ -39,11 +39,8 @@ function fetchExams() {
     .then(function(data) {
         dbExams = data;
         renderExams();
-        checkSharedLink();
     })
-    .catch(function(error) {
-        console.error("Error fetching exams:", error);
-    });
+    .catch(function(error) { console.error("Error fetching exams:", error); });
 }
 
 function renderExams() {
@@ -61,27 +58,16 @@ function renderExams() {
     });
 }
 
-function checkSharedLink() {
-    var urlParams = new URLSearchParams(window.location.search);
-    var examSlug = urlParams.get('exam');
-    if (examSlug) {
-        var exam = dbExams.find(function(e) { return e.slug === examSlug; });
-        if(exam) openExamPackages(exam._id);
-    }
-}
-
-function shareExamLink(examSlug) {
-    var url = window.location.origin + window.location.pathname + '?exam=' + examSlug;
-    navigator.clipboard.writeText(url);
-    alert('Shareable link copied: ' + url);
-}
-
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
     if (!currentExam) return;
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
     var shareBtn = document.getElementById('share-link-btn');
-    shareBtn.onclick = function() { shareExamLink(currentExam.slug); };
+    shareBtn.onclick = function() { 
+        var url = window.location.origin + window.location.pathname + '?exam=' + currentExam.slug;
+        navigator.clipboard.writeText(url);
+        alert('Shareable link copied: ' + url);
+    };
     document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
     document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
     document.getElementById('price-all-subjects').innerText = currentExam.prices.all_subjects;
@@ -182,6 +168,7 @@ function verifyAndShowContent() {
     errorMsg.style.display = 'none';
     document.getElementById('content-display').style.display = 'none';
     if(!inputPin) return alert("Please enter a PIN.");
+    
     fetch(API_URL + '/pins/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
