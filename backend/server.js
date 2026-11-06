@@ -11,6 +11,9 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+// --- WAKE UP ROUTE ---
+app.get('/api/ping', (req, res) => res.send('awake'));
+
 // Initialize Database Tables
 async function initDB() {
     await db.execute(`
@@ -40,7 +43,6 @@ async function initDB() {
         );
     `);
 
-    // Seed default data if empty
     const exams = await db.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
         const defaultSubjects = JSON.stringify(['Maths', 'English', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Literature', 'Geography', 'Agriculture', 'Further Maths'].map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
@@ -75,7 +77,7 @@ app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
         const formatted = result.rows.map(row => ({
-            _id: row.id, 
+            _id: String(row.id), // Force to String
             name: row.name, 
             slug: row.slug, 
             logo: row.logo,
@@ -114,7 +116,7 @@ app.post('/api/pins', async (req, res) => {
         
         await db.execute({
             sql: "INSERT INTO pins (pin, examId, subjects, deviceId, date) VALUES (?, ?, ?, ?, ?)",
-            args: [finalPin, examId, JSON.stringify(subjects), deviceId, new Date().toISOString()]
+            args: [finalPin, String(examId), JSON.stringify(subjects), deviceId, new Date().toISOString()]
         });
         res.json({ success: true, pin: finalPin });
     } catch (err) { 
@@ -133,7 +135,7 @@ app.post('/api/pins/verify', async (req, res) => {
         const pinData = pinRes.rows[0];
         if (pinData.deviceId !== deviceId) return res.status(403).json({ error: 'Fraud Alert: Wrong Device' });
 
-        const examRes = await db.execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [pinData.examId] });
+        const examRes = await db.execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [String(pinData.examId)] });
         if (examRes.rows.length === 0) return res.status(404).json({ error: 'Exam deleted.' });
         
         const examData = examRes.rows[0];
@@ -144,7 +146,7 @@ app.post('/api/pins/verify', async (req, res) => {
                 pin: pinData.pin,
                 subjects: JSON.parse(pinData.subjects),
                 examId: {
-                    _id: examData.id, 
+                    _id: String(examData.id), 
                     name: examData.name,
                     subjects: JSON.parse(examData.subjects)
                 }
