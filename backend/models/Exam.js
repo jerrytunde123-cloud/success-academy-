@@ -16,9 +16,9 @@ const examSchema = new mongoose.Schema({
     },
     subjects: [{
         name: String,
-        content: String,       // Text Answers
-        thumbnail: String,     // Base64 Image
-        qaImages: [String]     // Array of Base64 Images
+        content: String,       // Must be a String
+        thumbnail: String,     // Must be a String
+        qaImages: [String]     // Must be an Array of Strings
     }]
 });
 
