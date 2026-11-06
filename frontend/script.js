@@ -1,5 +1,8 @@
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
+// --- WAKE UP SERVER ON LOAD ---
+fetch(API_URL + '/ping').catch(() => console.log("Waking server..."));
+
 var dbExams = [];
 var currentExam = null;
 var currentPackageType = null;
@@ -33,6 +36,9 @@ function showPage(pageId) {
 }
 
 function fetchExams() {
+    var grid = document.getElementById('home-exam-grid');
+    grid.innerHTML = '<p style="text-align:center; color:blue;">Waking up server... Please wait up to 50 seconds.</p>';
+    
     fetch(API_URL + '/exams', { cache: "no-store" })
     .then(function(response) { 
         if(!response.ok) throw new Error("Server error");
@@ -44,7 +50,7 @@ function fetchExams() {
     })
     .catch(function(error) { 
         console.error("Error fetching exams:", error); 
-        document.getElementById('home-exam-grid').innerHTML = '<p style="color:red; text-align:center;">Failed to load exams. Check backend connection.</p>';
+        grid.innerHTML = '<p style="color:red; text-align:center;">Failed to load exams. Please refresh the page.</p>';
     });
 }
 
@@ -180,7 +186,7 @@ function verifyAndShowContent() {
     
     errorMsg.style.display = 'none';
     contentDisplay.style.display = 'block';
-    answersDiv.innerHTML = 'Loading...';
+    answersDiv.innerHTML = '<p style="color:blue;">Verifying (Server might be waking up, please wait 50s)...</p>';
 
     if(!inputPin) {
         answersDiv.innerHTML = '';
@@ -234,12 +240,12 @@ function verifyAndShowContent() {
         }
         
         if(contentText === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
-            answersDiv.innerHTML = '<p style="color:red;">No content found for the selected subjects.</p>';
+            answersDiv.innerHTML = '<p style="color:red;">No content found for the selected subjects. Please save data in the Admin panel.</p>';
         }
     })
     .catch(function(error) { 
         console.error(error);
-        errorMsg.innerText = 'Connection error.'; 
+        errorMsg.innerText = 'Connection error. Server is likely asleep. Please wait 1 minute and try again.'; 
         errorMsg.style.display = 'block'; 
         answersDiv.innerHTML = '';
     });
