@@ -1,22 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const multer = require('multer');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs'); // Required to create the uploads folder
 const Exam = require('./models/Exam');
 const Pin = require('./models/Pin');
 const Enquiry = require('./models/Enquiry');
 
 const app = express();
-// Allow your Vercel frontend and localhost to connect
-app.use(cors({
-    origin: ['https://success-academy-afri.vercel.app', 'http://localhost:3000', 'http://127.0.0.1:5500'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-}));
-app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+app.use(cors());
+app.use(express.json({ limit: '50mb' })); // Increase limit for Base64 images
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://jerrytunde123_db_user:<Wjh7YkO58X901Q9p>@cluster.f4jypw9.mongodb.net/';
 
@@ -42,45 +34,13 @@ mongoose.connect(MONGO_URI)
 })
 .catch(err => console.log('MongoDB Connection Error:', err));
 
-// --- FIX: Ensure uploads folder exists ---
-if (!fs.existsSync('uploads')) {
-    fs.mkdirSync('uploads');
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => { cb(null, 'uploads/'); },
-    filename: (req, file, cb) => { cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname)); }
-});
-const upload = multer({ storage });
-
 // --- ROUTES ---
 app.get('/api/exams', async (req, res) => {
     try { res.json(await Exam.find()); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/exams/:slug', async (req, res) => {
-    try { 
-        const exam = await Exam.findOne({ slug: req.params.slug });
-        if(!exam) return res.status(404).json({error: 'Exam not found'});
-        res.json(exam); 
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.put('/api/exams/:id', async (req, res) => {
     try { res.json(await Exam.findByIdAndUpdate(req.params.id, req.body, { new: true })); } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/upload/thumbnail', upload.single('image'), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-    res.json({ imageUrl: `${baseUrl}/uploads/${req.file.filename}` });
-});
-
-app.post('/api/upload/qa', upload.array('images', 25), (req, res) => {
-    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-    const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
-    const imageUrls = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
-    res.json({ imageUrls });
 });
 
 app.post('/api/pins', async (req, res) => {
@@ -115,7 +75,7 @@ app.post('/api/enquiries', async (req, res) => {
 });
 
 app.get('/api/enquiries', async (req, res) => {
-    try { res.json(await Enquiry.find().sort({ date: -1 })); } catch (err) { res.status(500).json({ error: err.message }); }  
+    try { res.json(await Enquiry.find().sort({ date: -1 })); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = process.env.PORT || 5000;
