@@ -4,26 +4,26 @@ const { createClient } = require('@libsql/client');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); 
+app.use(express.json({ limit: '52428800' })); 
+app.use(express.urlencoded({ limit: '52428800', extended: true }));
 
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// ⚠️ EXPANDED SUBJECT LIST (20+ Subjects) ⚠️
+// ⚠️ ADDED CIVIC EDUCATION ⚠️
 const FULL_SUBJECT_LIST = [
     "English Language", "Mathematics", "Biology", "Chemistry", "Physics", 
     "Economics", "Commerce", "Principles of Accounts", "Literature-in-English", 
     "Government", "Geography", "History", "Christian Religious Studies", 
     "Islamic Religious Studies", "Computer Studies", "Agricultural Science", 
     "Hausa", "Igbo", "Yoruba", "French", "Arabic", "Home Economics", 
-    "Physical and Health Education", "Art", "Music"
+    "Physical and Health Education", "Art", "Music", "Civic Education"
 ];
 
 async function initDB() {
-    // Drop tables to force a fresh start with the new subject list
-    // (You can remove the DROP lines later once everything is perfect)
+    // Drop tables to force the new subject list to load
     await db.execute(`DROP TABLE IF EXISTS exams;`);
     
     await db.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
@@ -32,7 +32,6 @@ async function initDB() {
 
     const exams = await db.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
-        // Seed with the FULL subject list
         const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
         const defaultPrices = JSON.stringify({ per_subject: 1000, per_dept: 5000, all_subjects: 8000 });
         const defaultAllow = JSON.stringify({ per_subject: true, per_dept: true, all_subjects: true });
@@ -51,7 +50,7 @@ async function initDB() {
                 args: [defaults[i][0], defaults[i][1], defaults[i][2], defaults[i][3], defaultPrices, defaultAllow, defaultSubjects]
             });
         }
-        console.log('Database seeded with 25 subjects.');
+        console.log('Database seeded with updated subject list including Civic Education.');
     }
 }
 initDB();
