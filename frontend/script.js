@@ -1,13 +1,15 @@
-// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
+// ⚠️ 1. PUT YOUR LIVE RENDER URL HERE
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
-let dbExams = [];
-let currentExam = null;
-let currentPackageType = null;
-let currentPrice = 0;
+// State variables
+var dbExams = [];
+var currentExam = null;
+var currentPackageType = null;
+var currentPrice = 0;
 
+// --- DEVICE ID LOGIC ---
 function getDeviceId() {
-    let deviceId = localStorage.getItem('sa_device_id');
+    var deviceId = localStorage.getItem('sa_device_id');
     if (!deviceId) {
         deviceId = 'DEV-' + Math.random().toString(36).substr(2, 9).toUpperCase();
         localStorage.setItem('sa_device_id', deviceId);
@@ -16,70 +18,88 @@ function getDeviceId() {
 }
 
 function displayDeviceId() {
-    const display = document.getElementById('user-device-id-display');
-    if(display) display.innerText = getDeviceId();
-}
-
-function copyDeviceId() {
-    const deviceId = getDeviceId();
-    navigator.clipboard.writeText(deviceId);
-    alert('Device ID Copied! Send this to Support on Telegram if you need help recovering a PIN.');
-}
-
-function showPage(pageId) {
-    document.querySelectorAll('main').forEach(main => main.style.display = 'none');
-    document.getElementById('page-' + pageId).style.display = 'block';
-    if(pageId === 'verify') displayDeviceId();
-}
-
-async function fetchExams() {
-    try {
-        // ⚠️ FORCE NO-CACHE: This ensures admin changes appear immediately
-        const response = await fetch(`${API_URL}/exams`, { cache: "no-store" });
-        dbExams = await response.json();
-        renderExams();
-        checkSharedLink(); 
-    } catch (error) { 
-        console.error("Error fetching exams:", error); 
-        document.getElementById('home-exam-grid').innerHTML = '<p style="text-align:center; color:red;">Failed to load exams. Check your internet connection.</p>';
+    var display = document.getElementById('user-device-id-display');
+    if(display) {
+        display.innerText = getDeviceId();
     }
 }
 
+function copyDeviceId() {
+    navigator.clipboard.writeText(getDeviceId());
+    alert('Device ID Copied! Send this to Support on Telegram.');
+}
+
+// --- NAVIGATION ---
+function showPage(pageId) {
+    var mains = document.querySelectorAll('main');
+    for(var i=0; i<mains.length; i++) {
+        mains[i].style.display = 'none';
+    }
+    document.getElementById('page-' + pageId).style.display = 'block';
+    
+    if(pageId === 'verify') {
+        displayDeviceId();
+    }
+}
+
+// --- FETCH & RENDER EXAMS ---
+function fetchExams() {
+    fetch(API_URL + '/exams', { cache: "no-store" })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+        dbExams = data;
+        renderExams();
+        checkSharedLink();
+    })
+    .catch(function(error) {
+        console.error("Error fetching exams:", error);
+        document.getElementById('home-exam-grid').innerHTML = '<p style="text-align:center; color:red;">Failed to connect to server.</p>';
+    });
+}
+
 function renderExams() {
-    const grid = document.getElementById('home-exam-grid');
+    var grid = document.getElementById('home-exam-grid');
     if (!grid) return;
     grid.innerHTML = '';
-    dbExams.forEach(exam => {
-        const card = document.createElement('div');
+    
+    dbExams.forEach(function(exam) {
+        var card = document.createElement('div');
         card.className = 'exam-card';
-        card.onclick = () => openExamPackages(exam._id);
-        const fallbackImg = 'https://via.placeholder.com/60/001f5b/ffcc00?text=' + exam.name.substring(0,2);
-        card.innerHTML = `<img src="${exam.logo || fallbackImg}" onerror="this.src='${fallbackImg}'"><h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">${exam.name}</h3>`;
+        card.onclick = function() { openExamPackages(exam._id); };
+        
+        var fallbackImg = 'https://via.placeholder.com/60/001f5b/ffcc00?text=' + exam.name.substring(0,2);
+        card.innerHTML = '<img src="' + (exam.logo || fallbackImg) + '" onerror="this.src=\'' + fallbackImg + '\'">' + 
+                         '<h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">' + exam.name + '</h3>';
         grid.appendChild(card);
     });
 }
 
+// --- SHARING ---
 function checkSharedLink() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const examSlug = urlParams.get('exam');
+    var urlParams = new URLSearchParams(window.location.search);
+    var examSlug = urlParams.get('exam');
     if (examSlug) {
-        const exam = dbExams.find(e => e.slug === examSlug);
+        var exam = dbExams.find(function(e) { return e.slug === examSlug; });
         if(exam) openExamPackages(exam._id);
     }
 }
 
 function shareExamLink(examSlug) {
-    const url = `${window.location.origin}${window.location.pathname}?exam=${examSlug}`;
+    var url = window.location.origin + window.location.pathname + '?exam=' + examSlug;
     navigator.clipboard.writeText(url);
     alert('Shareable link copied: ' + url);
 }
 
+// --- PACKAGES & CHECKOUT ---
 function openExamPackages(examId) {
-    currentExam = dbExams.find(e => e._id === examId);
+    currentExam = dbExams.find(function(e) { return e._id === examId; });
     if (!currentExam) return;
 
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
-    document.getElementById('share-link-btn').onclick = () => shareExamLink(currentExam.slug);
+    
+    // Set share link button
+    var shareBtn = document.getElementById('share-link-btn');
+    shareBtn.onclick = function() { shareExamLink(currentExam.slug); };
     
     document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
     document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
@@ -94,165 +114,199 @@ function openExamPackages(examId) {
 
 function openCheckout(packageType) {
     currentPackageType = packageType;
-    const previewArea = document.getElementById('preview-image-area');
-    const previewImg = document.getElementById('subject-preview-img');
-    const subjectArea = document.getElementById('subject-selection-area');
-    const subjectCheckboxes = document.getElementById('subject-checkboxes');
+    var previewArea = document.getElementById('preview-image-area');
+    var previewImg = document.getElementById('subject-preview-img');
+    var subjectArea = document.getElementById('subject-selection-area');
+    var subjectCheckboxes = document.getElementById('subject-checkboxes');
 
     if (packageType === 'per_subject') {
         currentPrice = currentExam.prices.per_subject;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'block';
         previewImg.src = 'https://via.placeholder.com/300x150?text=Select+a+Subject';
-        subjectCheckboxes.innerHTML = currentExam.subjects.map(sub => `
-            <label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="${sub.name}" onchange="updatePreviewAndLimit(this, 1)"> ${sub.name}</label>
-        `).join('');
+        
+        var html = '';
+        currentExam.subjects.forEach(function(sub) {
+            html += '<label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="' + sub.name + '" onchange="updatePreviewAndLimit(this, 1)"> ' + sub.name + '</label>';
+        });
+        subjectCheckboxes.innerHTML = html;
+        
     } else if (packageType === 'per_dept') {
         currentPrice = currentExam.prices.per_dept;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'none';
-        const maxSubs = (currentExam.name.includes('JAMB') || currentExam.name.includes('JUPEB') || currentExam.name.includes('IJMB')) ? 4 : 9;
-        subjectCheckboxes.innerHTML = currentExam.subjects.map(sub => `
-            <label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="${sub.name}" onchange="limitSubjects(this, ${maxSubs})"> ${sub.name}</label>
-        `).join('');
+        var maxSubs = (currentExam.name.includes('JAMB') || currentExam.name.includes('JUPEB') || currentExam.name.includes('IJMB')) ? 4 : 9;
+        
+        var html = '';
+        currentExam.subjects.forEach(function(sub) {
+            html += '<label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="' + sub.name + '" onchange="limitSubjects(this, ' + maxSubs + ')"> ' + sub.name + '</label>';
+        });
+        subjectCheckboxes.innerHTML = html;
+        
     } else {
         currentPrice = currentExam.prices.all_subjects;
         subjectArea.style.display = 'none';
         previewArea.style.display = 'none';
     }
+    
     document.getElementById('checkout-amount').innerText = '₦' + currentPrice;
     document.getElementById('checkout-modal').style.display = 'flex';
 }
 
 function updatePreviewAndLimit(checkbox, max) {
-    const checked = document.querySelectorAll('input[name="subject"]:checked');
-    if (checked.length > max) { checkbox.checked = false; return; }
+    var checked = document.querySelectorAll('input[name="subject"]:checked');
+    if (checked.length > max) { 
+        checkbox.checked = false; 
+        return; 
+    }
     if (checkbox.checked) {
-        const subData = currentExam.subjects.find(s => s.name === checkbox.value);
+        var subData = currentExam.subjects.find(function(s) { return s.name === checkbox.value; });
         document.getElementById('subject-preview-img').src = subData.thumbnail || 'https://via.placeholder.com/300x150?text=No+Preview';
     }
 }
 
 function limitSubjects(checkbox, max) {
-    const checked = document.querySelectorAll('input[name="subject"]:checked');
-    if (checked.length > max) { checkbox.checked = false; alert('Max ' + max + ' subjects allowed.'); }
+    var checked = document.querySelectorAll('input[name="subject"]:checked');
+    if (checked.length > max) { 
+        checkbox.checked = false; 
+        alert('Max ' + max + ' subjects allowed.'); 
+    }
 }
 
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function closeModal(id) { 
+    document.getElementById(id).style.display = 'none'; 
+}
 
+// --- PAYSTACK ---
 function payWithPaystack() {
-    let selectedSubjects = [];
+    var selectedSubjects = [];
     if (currentPackageType !== 'all_subjects') {
-        document.querySelectorAll('input[name="subject"]:checked').forEach(cb => selectedSubjects.push(cb.value));
+        var checked = document.querySelectorAll('input[name="subject"]:checked');
+        checked.forEach(function(cb) { selectedSubjects.push(cb.value); });
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
 
-    let handler = PaystackPop.setup({
+    var handler = PaystackPop.setup({
         key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
-        callback: function(response) { generatePIN(selectedSubjects); }
+        callback: function(response) { 
+            generatePIN(selectedSubjects); 
+        }
     });
     handler.openIframe(); 
 }
 
-async function generatePIN(selectedSubjects) {
+function generatePIN(selectedSubjects) {
     closeModal('checkout-modal');
-    const subjectNames = currentPackageType === 'all_subjects' ? currentExam.subjects.map(s => s.name) : selectedSubjects;
-    try {
-        const response = await fetch(`${API_URL}/pins`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ examId: currentExam._id, subjects: subjectNames, deviceId: getDeviceId() })
-        });
-        const data = await response.json();
+    var subjectNames = currentPackageType === 'all_subjects' ? currentExam.subjects.map(function(s) { return s.name; }) : selectedSubjects;
+    
+    fetch(API_URL + '/pins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ examId: currentExam._id, subjects: subjectNames, deviceId: getDeviceId() })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
         if (data.success) {
             document.getElementById('generated-pin').innerText = data.pin;
             document.getElementById('success-modal').style.display = 'flex';
         }
-    } catch (error) { alert('Error generating PIN.'); }
+    })
+    .catch(function() { alert('Error generating PIN.'); });
 }
 
-async function verifyAndShowContent() {
-    const inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
-    const errorMsg = document.getElementById('pin-error');
+// --- VERIFY CONTENT ---
+function verifyAndShowContent() {
+    var inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
+    var errorMsg = document.getElementById('pin-error');
     
     errorMsg.style.display = 'none';
     document.getElementById('content-display').style.display = 'none';
 
     if(!inputPin) return alert("Please enter a PIN.");
 
-    try {
-        const response = await fetch(`${API_URL}/pins/verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            cache: "no-store",
-            body: JSON.stringify({ pin: inputPin, deviceId: getDeviceId() })
+    fetch(API_URL + '/pins/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: "no-store",
+        body: JSON.stringify({ pin: inputPin, deviceId: getDeviceId() })
+    })
+    .then(function(response) {
+        return response.json().then(function(data) {
+            return { status: response.status, ok: response.ok, data: data };
         });
-        
-        const result = await response.json();
-        
-        if (!response.ok) { 
-            errorMsg.innerText = result.error || 'Invalid PIN'; 
+    })
+    .then(function(result) {
+        if (!result.ok) { 
+            errorMsg.innerText = result.data.error || 'Invalid PIN'; 
             errorMsg.style.display = 'block'; 
             return; 
         }
 
         document.getElementById('content-display').style.display = 'block';
-        const examInfo = dbExams.find(e => e._id === result.data.examId._id);
-        let contentText = "";
+        var examInfo = dbExams.find(function(e) { return e._id === result.data.examId._id; });
+        var contentText = "";
         
         if (result.data.subjects) {
-            result.data.subjects.forEach(subName => {
-                const subjectData = examInfo.subjects.find(s => s.name === subName);
+            result.data.subjects.forEach(function(subName) {
+                var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData) {
-                    contentText += `--- ${subjectData.name.toUpperCase()} ---\n${subjectData.content || 'No text content yet'}\n\n`;
+                    contentText += '--- ' + subjectData.name.toUpperCase() + ' ---\n' + (subjectData.content || 'No text content yet') + '\n\n';
                 }
             });
         }
         
-        const answersDiv = document.getElementById('actual-answers');
-        answersDiv.innerHTML = `<pre style="font-family:monospace; white-space:pre-wrap;">${contentText}</pre>`;
+        var answersDiv = document.getElementById('actual-answers');
+        answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap;">' + contentText + '</pre>';
         
         if (result.data.subjects) {
-            result.data.subjects.forEach(subName => {
-                const subjectData = examInfo.subjects.find(s => s.name === subName);
+            result.data.subjects.forEach(function(subName) {
+                var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
-                    answersDiv.innerHTML += `<h4 style="margin-top:15px; color:var(--primary-blue);">${subName} Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">`;
-                    subjectData.qaImages.forEach(imgUrl => {
-                        answersDiv.innerHTML += `<img src="${imgUrl}" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">`;
+                    answersDiv.innerHTML += '<h4 style="margin-top:15px; color:var(--primary-blue);">' + subName + ' Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
+                    subjectData.qaImages.forEach(function(imgUrl) {
+                        answersDiv.innerHTML += '<img src="' + imgUrl + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
                     });
-                    answersDiv.innerHTML += `</div>`;
+                    answersDiv.innerHTML += '</div>';
                 }
             });
         }
-
-    } catch (error) { 
+    })
+    .catch(function(error) { 
         console.error(error);
         errorMsg.innerText = 'Connection error. Please try again later.'; 
         errorMsg.style.display = 'block'; 
-    }
+    });
 }
 
-// Handle Contact Form Submission
-document.getElementById('enquiryForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const data = {
-        name: document.getElementById('name').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value,
-        exam: document.getElementById('exam-select-enquiry').value,
-        message: document.getElementById('message').value
-    };
-    try {
-        await fetch(`${API_URL}/enquiries`, { 
+// --- CONTACT FORM ---
+var enquiryForm = document.getElementById('enquiryForm');
+if(enquiryForm) {
+    enquiryForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var data = {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            exam: document.getElementById('exam-select-enquiry').value,
+            message: document.getElementById('message').value
+        };
+        
+        fetch(API_URL + '/enquiries', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify(data) 
-        });
-        alert('Message sent successfully!'); 
-        this.reset();
-    } catch (err) { alert('Failed to send message.'); }
-});
+        })
+        .then(function() {
+            alert('Message sent successfully!'); 
+            enquiryForm.reset();
+        })
+        .catch(function() { alert('Failed to send message.'); });
+    });
+}
 
-window.onload = () => { if(document.getElementById('home-exam-grid')) fetchExams(); };
+// Initialize
+window.onload = function() { 
+    if(document.getElementById('home-exam-grid')) fetchExams(); 
+};
