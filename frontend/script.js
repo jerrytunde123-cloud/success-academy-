@@ -34,12 +34,18 @@ function showPage(pageId) {
 
 function fetchExams() {
     fetch(API_URL + '/exams', { cache: "no-store" })
-    .then(function(response) { return response.json(); })
+    .then(function(response) { 
+        if(!response.ok) throw new Error("Server error");
+        return response.json(); 
+    })
     .then(function(data) {
         dbExams = data;
         renderExams();
     })
-    .catch(function(error) { console.error("Error fetching exams:", error); });
+    .catch(function(error) { 
+        console.error("Error fetching exams:", error); 
+        document.getElementById('home-exam-grid').innerHTML = '<p style="color:red; text-align:center;">Failed to load exams. Check backend connection.</p>';
+    });
 }
 
 function renderExams() {
@@ -166,7 +172,6 @@ function generatePIN(selectedSubjects) {
     .catch(function() { alert('Error generating PIN.'); });
 }
 
-// ⚠️ FINAL VERIFICATION LOGIC ⚠️
 function verifyAndShowContent() {
     var inputPin = document.getElementById('user-pin-input').value.trim().toUpperCase();
     var errorMsg = document.getElementById('pin-error');
@@ -175,7 +180,7 @@ function verifyAndShowContent() {
     
     errorMsg.style.display = 'none';
     contentDisplay.style.display = 'block';
-    answersDiv.innerHTML = '<p style="color:blue;">Verifying PIN and loading data (wait 5s)...</p>';
+    answersDiv.innerHTML = 'Loading...';
 
     if(!inputPin) {
         answersDiv.innerHTML = '';
@@ -195,14 +200,12 @@ function verifyAndShowContent() {
         if (!result.ok) { 
             errorMsg.innerText = result.data.error || 'Invalid PIN'; 
             errorMsg.style.display = 'block'; 
-            contentDisplay.style.display = 'none';
+            answersDiv.innerHTML = '';
             return; 
         }
 
-        // The backend sends the fully populated exam object in result.data.examId
         var pinData = result.data;
-        var examInfo = pinData.examId; // This is the full exam object
-
+        var examInfo = pinData.examId; 
         var contentText = "";
         
         if (pinData.subjects && examInfo) {
@@ -231,14 +234,14 @@ function verifyAndShowContent() {
         }
         
         if(contentText === "" && answersDiv.innerHTML.indexOf('<img') === -1) {
-            answersDiv.innerHTML = '<p style="color:red;">No content found for the selected subjects. Please check the admin panel.</p>';
+            answersDiv.innerHTML = '<p style="color:red;">No content found for the selected subjects.</p>';
         }
     })
     .catch(function(error) { 
         console.error(error);
-        errorMsg.innerText = 'Connection error. Please try again later.'; 
+        errorMsg.innerText = 'Connection error.'; 
         errorMsg.style.display = 'block'; 
-        contentDisplay.style.display = 'none';
+        answersDiv.innerHTML = '';
     });
 }
 
