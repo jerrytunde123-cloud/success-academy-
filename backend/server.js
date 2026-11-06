@@ -2,29 +2,32 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@libsql/client');
 
+// 1. Initialize Express FIRST
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); 
 
-console.log("--- STARTING SERVER ---");
-console.log("TURSO URL exists:", !!process.env.TURSO_DATABASE_URL);
-console.log("TURSO TOKEN exists:", !!process.env.TURSO_AUTH_TOKEN);
-
+// 2. Setup Turso
 const db = createClient({
-  url: process.env.TURSO_DATABASE_URL || 'libsql://placeholder.turso.io',
-  authToken: process.env.TURSO_AUTH_TOKEN || 'placeholder',
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-app.get('/api/ping', (req, res) => res.send('awake'));
+// 3. Define the Ping Route for testing
+app.get('/api/ping', (req, res) => {
+    res.json({ status: "awake", message: "Backend is running perfectly!" });
+});
 
-// Initialize Database Tables
+// 4. Initialize Database Tables
 async function initDB() {
-    console.log("--- ATTEMPTING TO CONNECT TO TURSO ---");
+    console.log("--- STARTING SERVER ---");
+    console.log("TURSO URL exists:", !!process.env.TURSO_DATABASE_URL);
+    console.log("TURSO TOKEN exists:", !!process.env.TURSO_AUTH_TOKEN);
+    
     try {
         await db.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
         await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
         await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
-        console.log("--- TABLES CREATED/VERIFIED ---");
 
         const exams = await db.execute("SELECT * FROM exams");
         if (exams.rows.length === 0) {
@@ -49,16 +52,18 @@ async function initDB() {
             }
             console.log('--- DATABASE SEEDED SUCCESSFULLY ---');
         } else {
-            console.log('--- DATABASE ALREADY HAS DATA ---');
+            console.log('--- DATABASE ALREADY HAS DATA (Skipping Seed) ---');
         }
     } catch (err) {
         console.error("!!! TURSO CONNECTION ERROR !!!");
-        console.error(err.message); // This will show us the exact error
+        console.error(err.message);
     }
 }
-initDB();
 
-// --- ROUTES ---
+// 5. Call initDB but DON'T let it crash the server if it fails
+initDB().catch(err => console.error("initDB failed:", err));
+
+// --- API ROUTES ---
 app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
@@ -152,5 +157,6 @@ app.get('/api/enquiries', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// 6. Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
