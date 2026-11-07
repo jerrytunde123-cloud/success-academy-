@@ -12,7 +12,7 @@
 
     <header>
         <div class="logo-container" onclick="showPage('home')">
-            <img src="logo.png" alt="Logo" class="header-logo" onerror="this.src='https://via.placeholder.com/60?text=SA'">
+            <img src="logo.png" alt="Logo" class="header-logo" onerror="this.src='https://placehold.co/60x60/001f5b/fff?text=SA'">
             <div>
                 <h1>SUCCESS ACADEMY</h1>
                 <span>Premium Exam Portal</span>
@@ -21,6 +21,7 @@
         <nav>
             <ul>
                 <li><a href="#" onclick="showPage('home')">Home</a></li>
+                <li><a href="#" onclick="showPage('updates')">Updates</a></li> <!-- NEW LINK -->
                 <li><a href="#" onclick="showPage('history')">My PINs</a></li>
                 <li><a href="#" onclick="showPage('verify')">View Content</a></li>
             </ul>
@@ -65,6 +66,12 @@
         </section>
     </main>
 
+    <!-- NEW: UPDATES PAGE -->
+    <main id="page-updates" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
+        <h2 class="section-title">Latest News & Updates</h2>
+        <div id="news-container"></div>
+    </main>
+
     <main id="page-packages" style="display: none; padding: 40px 5%;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
@@ -97,14 +104,10 @@
     </main>
 
     <main id="page-verify" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
-        
         <div style="background: #eef2f5; border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
             <p style="font-size: 14px; color: #666; margin-bottom: 5px;">Your Unique Device ID:</p>
             <h3 id="user-device-id-display" style="color: var(--primary-blue); letter-spacing: 1px; font-family: monospace; margin-bottom: 10px;">Loading...</h3>
-            <button onclick="copyDeviceId()" style="background: var(--accent-yellow); border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;">
-                <i class="fas fa-copy"></i> Copy ID
-            </button>
-            <p style="font-size: 12px; color: #888; margin-top: 10px;">If you lose your PIN or have payment issues, send this ID to our <a href="https://t.me/Officialkingjay1" target="_blank" style="color: #0088cc;">Telegram Support</a>.</p>
+            <button onclick="copyDeviceId()" style="background: var(--accent-yellow); border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;"><i class="fas fa-copy"></i> Copy ID</button>
         </div>
 
         <div class="verify-box">
@@ -119,6 +122,7 @@
         </div>
     </main>
 
+    <!-- Modals remain the same -->
     <div id="checkout-modal" class="modal">
         <div class="modal-content">
             <h3>Checkout: <span id="checkout-title"></span></h3>
@@ -130,12 +134,10 @@
                 <div id="subject-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;"></div>
             </div>
             <button class="btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button>
-            
             <div style="text-align:center; margin-top:15px;">
                 <p style="font-size:14px; color:#666; margin-bottom:5px;">Having payment issues?</p>
-                <a href="https://t.me/Officialkingjay1" target="_blank" style="background:#0088cc; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block;"><i class="fab fa-telegram"></i> Contact Support on Telegram</a>
+                <a href="https://t.me/Officialkingjay1" target="_blank" style="background:#0088cc; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block;"><i class="fab fa-telegram"></i> Contact Support</a>
             </div>
-
             <button class="btn-cancel" onclick="closeModal('checkout-modal')" style="margin-top: 15px;">Cancel</button>
         </div>
     </div>
@@ -145,18 +147,10 @@
             <h3 style="color: green;">Payment Successful!</h3>
             <p>Your unique PIN is:</p>
             <h1 id="generated-pin" style="letter-spacing: 5px; color: var(--primary-blue);"></h1>
-            <p style="font-size:13px; color:#666; margin-bottom:15px;">Save this PIN! You can view it later in the "My PINs" tab.</p>
             <button class="btn-buy" onclick="closeModal('success-modal'); showPage('verify');">View Answers Now</button>
         </div>
     </div>
 
-    <!-- RESTORED FOOTER -->
-    <footer style="text-align: center; padding: 20px; background: #000; color: #aaa; font-size: 14px;">
-        <img src="logo.png" alt="Success Academy" style="width: 60px; margin-bottom: 10px;" onerror="this.style.display='none'">
-        <p>&copy; 2024 Success Academy. All Rights Reserved.</p>
-        <p style="margin-top: 5px;">Serving Students Across Nigeria and West Africa</p>
-    </footer>
-
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>
