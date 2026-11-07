@@ -110,10 +110,18 @@ function renderExams() {
     });
 }
 
-// ⚠️ FIXED: Displays multiple images for News
+// ⚠️ UPDATED: Truncates text, adds Read More button, and checks for shared link
 function fetchNews() {
     var container = document.getElementById('news-container');
     container.innerHTML = 'Loading updates...';
+    
+    // Check if the URL has a specific news ID (e.g., #news-5)
+    var hash = window.location.hash;
+    var targetNewsId = null;
+    if (hash && hash.startsWith('#news-')) {
+        targetNewsId = parseInt(hash.replace('#news-', ''));
+    }
+
     fetch(API_URL + '/news', { cache: "no-store" })
     .then(function(res) { return res.json(); })
     .then(function(data) {
@@ -122,6 +130,7 @@ function fetchNews() {
             container.innerHTML = '<p style="text-align:center; color:#666;">No updates yet. Check back later!</p>';
             return;
         }
+        
         data.forEach(function(item) {
             var date = new Date(item.date).toLocaleDateString();
             
@@ -130,6 +139,10 @@ function fetchNews() {
                 /(https?:\/\/[^\s]+)/g, 
                 '<a href="$1" target="_blank" style="color:#0088cc; text-decoration:underline; word-break:break-all;">$1</a>'
             );
+
+            // Check if text is longer than 150 characters
+            var isLong = item.content.length > 150;
+            var shortContent = isLong ? linkedContent.substring(0, 150) + '...' : linkedContent;
 
             // Loop through images array
             var imagesHtml = '';
@@ -140,18 +153,42 @@ function fetchNews() {
                 });
                 imagesHtml += '</div>';
             }
+
+            // If this specific news is opened via link, show it expanded
+            var isTarget = (targetNewsId === item.id);
+            var displayStyle = isTarget ? 'block' : 'none';
             
             container.innerHTML += `
-                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--accent-yellow);">
+                <div id="news-${item.id}" style="background:white; padding:20px; border-radius:10px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--accent-yellow);">
                     <h3 style="color:var(--primary-blue); margin-bottom:5px;">${item.title}</h3>
                     <p style="font-size:12px; color:#888; margin-bottom:15px;">${date}</p>
-                    ${imagesHtml}
-                    <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${linkedContent}</p>
+                    
+                    <div id="short-${item.id}" style="display: ${isTarget ? 'none' : 'block'};">
+                        <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${shortContent}</p>
+                        ${isLong ? `<button onclick="expandNews(${item.id})" style="background:none; border:none; color:var(--primary-blue); font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Read More →</button>` : ''}
+                    </div>
+
+                    <div id="full-${item.id}" style="display: ${displayStyle};">
+                        ${imagesHtml}
+                        <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${linkedContent}</p>
+                        ${isLong ? `<button onclick="collapseNews(${item.id})" style="background:none; border:none; color:red; font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Show Less ↑</button>` : ''}
+                    </div>
                 </div>
             `;
         });
     })
     .catch(function() { container.innerHTML = '<p style="color:red; text-align:center;">Failed to load updates.</p>'; });
+}
+
+// Functions to toggle the news text
+window.expandNews = function(id) {
+    document.getElementById('short-' + id).style.display = 'none';
+    document.getElementById('full-' + id).style.display = 'block';
+}
+
+window.collapseNews = function(id) {
+    document.getElementById('full-' + id).style.display = 'none';
+    document.getElementById('short-' + id).style.display = 'block';
 }
 
 function openExamPackages(examId) {
