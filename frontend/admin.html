@@ -123,15 +123,18 @@
         <!-- UPDATED NEWS TAB -->
         <div id="tab-news" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
-                <h3>Publish New Update</h3>
+                <h3 id="news-form-title">Publish New Update</h3>
+                <input type="hidden" id="edit-news-id">
                 <input type="text" id="news-title" placeholder="Title (e.g., WAEC Timetable Released)">
                 <textarea id="news-content" rows="5" placeholder="Write your update here..."></textarea>
                 
                 <label style="display:block; margin-top:10px; font-weight:bold;">Upload News Image (Optional):</label>
                 <input type="file" id="news-image-upload" accept="image/*">
-                <div id="news-image-preview" style="margin-top:10px;"></div>
                 
-                <button class="save-btn" style="margin-top:10px;" onclick="publishNews()">Publish Update</button>
+                <div style="margin-top:10px;">
+                    <button id="news-submit-btn" class="save-btn" onclick="saveNews()">Publish Update</button>
+                    <button id="news-cancel-btn" class="save-btn" style="background:#ccc; color:#333; display:none;" onclick="resetNewsForm()">Cancel Edit</button>
+                </div>
             </div>
             <h3>Published Updates</h3>
             <div id="news-list"></div>
@@ -159,7 +162,7 @@
     <script>
         window.onload = function() {
             const ADMIN_PASSWORD = "admin123"; 
-            const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
+            const API_URL = 'https://success-academy-backend-mhio.onrender.com/api'; 
             
             emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
             const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
@@ -335,36 +338,58 @@
                 } catch (error) { alert("Failed to save: " + error.message); }
             }
 
-            // --- NEWS FUNCTIONS ---
-            window.publishNews = async function() {
+            // --- NEWS FUNCTIONS (Publish & Edit) ---
+            window.saveNews = async function() {
+                const id = document.getElementById('edit-news-id').value;
                 const title = document.getElementById('news-title').value;
                 const content = document.getElementById('news-content').value;
                 const imageFile = document.getElementById('news-image-upload').files[0];
+                const btn = document.getElementById('news-submit-btn');
                 
                 if(!title || !content) return alert('Title and Content are required.');
                 
                 let imageUrl = '';
                 if(imageFile) {
                     try {
-                        document.querySelector('#tab-news .save-btn').innerText = 'Uploading Image...';
+                        btn.innerText = 'Uploading Image...';
                         imageUrl = await uploadFileToR2(imageFile);
-                    } catch(e) {
-                        return alert('Image upload failed: ' + e.message);
-                    }
+                    } catch(e) { return alert('Image upload failed: ' + e.message); }
                 }
 
-                await fetch(`${API_URL}/admin/news`, {
-                    method: 'POST',
+                btn.innerText = id ? 'Updating...' : 'Publishing...';
+
+                const url = id ? `${API_URL}/admin/news/${id}` : `${API_URL}/admin/news`;
+                const method = id ? 'PUT' : 'POST';
+
+                await fetch(url, {
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title, content, imageUrl })
                 });
                 
-                alert('News Published!');
+                alert(id ? 'News Updated!' : 'News Published!');
+                resetNewsForm();
+                loadNews();
+            }
+
+            window.editNews = function(id, title, content) {
+                document.getElementById('edit-news-id').value = id;
+                document.getElementById('news-title').value = title;
+                document.getElementById('news-content').value = content;
+                document.getElementById('news-form-title').innerText = 'Edit Update';
+                document.getElementById('news-submit-btn').innerText = 'Update News';
+                document.getElementById('news-cancel-btn').style.display = 'inline-block';
+                window.scrollTo(0,0);
+            }
+
+            window.resetNewsForm = function() {
+                document.getElementById('edit-news-id').value = '';
                 document.getElementById('news-title').value = '';
                 document.getElementById('news-content').value = '';
                 document.getElementById('news-image-upload').value = '';
-                document.querySelector('#tab-news .save-btn').innerText = 'Publish Update';
-                loadNews();
+                document.getElementById('news-form-title').innerText = 'Publish New Update';
+                document.getElementById('news-submit-btn').innerText = 'Publish Update';
+                document.getElementById('news-cancel-btn').style.display = 'none';
             }
 
             async function loadNews() {
@@ -378,15 +403,22 @@
                     const date = new Date(item.date).toLocaleDateString();
                     let imageHtml = item.imageUrl ? `<img src="${item.imageUrl}" style="max-width:100%; border-radius:5px; margin-top:10px;">` : '';
                     
+                    // Safely escape quotes for the edit function
+                    const safeTitle = item.title.replace(/'/g, "\\'");
+                    const safeContent = item.content.replace(/'/g, "\\'");
+
                     list.innerHTML += `
                         <div style="background:white; border:1px solid #ddd; padding:15px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-between;">
-                            <div style="width: 90%;">
+                            <div style="width: 85%;">
                                 <h4 style="margin:0 0 5px 0; color:#001f5b;">${item.title}</h4>
                                 <p style="font-size:12px; color:#888; margin:0 0 10px 0;">${date}</p>
                                 <p style="margin:0; white-space:pre-wrap;">${item.content}</p>
                                 ${imageHtml}
                             </div>
-                            <button onclick="deleteNews(${item.id})" style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; height:30px;">Delete</button>
+                            <div style="display:flex; flex-direction:column; gap:5px;">
+                                <button onclick="editNews(${item.id}, '${safeTitle}', '${safeContent}')" style="background:#ffcc00; color:#001f5b; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-weight:bold;">Edit</button>
+                                <button onclick="deleteNews(${item.id})" style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Delete</button>
+                            </div>
                         </div>
                     `;
                 });
