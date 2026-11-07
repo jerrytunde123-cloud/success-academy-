@@ -5,7 +5,7 @@ var dbExams = [];
 var currentExam = null;
 var currentPackageType = null;
 var currentPrice = 0;
-const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Image+Not+Uploaded+Yet';
+const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
 
 // Log visitor on page load
 fetch(API_URL + '/visitors', { method: 'POST' }).catch(() => {});
@@ -108,7 +108,6 @@ function renderExams() {
     });
 }
 
-// ⚠️ FIXED: Truncates text to 80 characters, always adds Read More button
 function fetchNews() {
     var container = document.getElementById('news-container');
     container.innerHTML = 'Loading updates...';
@@ -136,7 +135,6 @@ function fetchNews() {
                 '<a href="$1" target="_blank" style="color:#0088cc; text-decoration:underline; word-break:break-all;">$1</a>'
             );
 
-            // ⚠️ CHANGED: Truncate to 80 characters instead of 150
             var isLong = true; 
             var shortContent = linkedContent.substring(0, 80) + '...';
 
@@ -243,12 +241,22 @@ function openCheckout(packageType) {
     document.getElementById('checkout-modal').style.display = 'flex';
 }
 
+// ⚠️ FIXED: Enforces single selection for "Per Subject"
 function updatePreviewAndLimit(checkbox, max) {
-    var checked = document.querySelectorAll('input[name="subject"]:checked');
-    if (checked.length > max) { checkbox.checked = false; return; }
+    // If the user checked a box, uncheck all other boxes first
+    if (checkbox.checked) {
+        var allCheckboxes = document.querySelectorAll('input[name="subject"]');
+        allCheckboxes.forEach(function(cb) {
+            if (cb !== checkbox) cb.checked = false;
+        });
+    }
+    
     if (checkbox.checked) {
         var subData = currentExam.subjects.find(function(s) { return s.name === checkbox.value; });
         document.getElementById('subject-preview-img').src = subData.thumbnail || PLACEHOLDER;
+    } else {
+        // If they uncheck the box, revert to the placeholder
+        document.getElementById('subject-preview-img').src = PLACEHOLDER;
     }
 }
 
