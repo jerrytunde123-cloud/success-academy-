@@ -7,6 +7,9 @@ var currentPackageType = null;
 var currentPrice = 0;
 const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Image+Not+Uploaded+Yet';
 
+// ⚠️ LOG VISITOR ON PAGE LOAD
+fetch(API_URL + '/visitors', { method: 'POST' }).catch(() => {});
+
 function getDeviceId() {
     var deviceId = localStorage.getItem('sa_device_id');
     if (!deviceId) {
@@ -31,6 +34,7 @@ function showPage(pageId) {
     for(var i=0; i<mains.length; i++) mains[i].style.display = 'none';
     document.getElementById('page-' + pageId).style.display = 'block';
     if(pageId === 'verify') displayDeviceId();
+    if(pageId === 'updates') fetchNews();
 }
 
 function fetchExams() {
@@ -56,6 +60,31 @@ function renderExams() {
                          '<h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">' + exam.name + '</h3>';
         grid.appendChild(card);
     });
+}
+
+function fetchNews() {
+    var container = document.getElementById('news-container');
+    container.innerHTML = 'Loading updates...';
+    fetch(API_URL + '/news', { cache: "no-store" })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        container.innerHTML = '';
+        if(data.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#666;">No updates yet. Check back later!</p>';
+            return;
+        }
+        data.forEach(function(item) {
+            var date = new Date(item.date).toLocaleDateString();
+            container.innerHTML += `
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--accent-yellow);">
+                    <h3 style="color:var(--primary-blue); margin-bottom:5px;">${item.title}</h3>
+                    <p style="font-size:12px; color:#888; margin-bottom:15px;">${date}</p>
+                    <p style="white-space:pre-wrap; color:#333;">${item.content}</p>
+                </div>
+            `;
+        });
+    })
+    .catch(function() { container.innerHTML = '<p style="color:red; text-align:center;">Failed to load updates.</p>'; });
 }
 
 function openExamPackages(examId) {
