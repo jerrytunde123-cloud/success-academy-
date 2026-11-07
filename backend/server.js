@@ -30,8 +30,10 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
     
-    // Added imageUrl to the news table
-    await db.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, imageUrl TEXT, date TEXT);`);
+    // ⚠️ FIX: Drop the old news table to recreate it with the imageUrl column
+    await db.execute(`DROP TABLE IF EXISTS news;`);
+    await db.execute(`CREATE TABLE news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, imageUrl TEXT, date TEXT);`);
+    
     await db.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
     
     const exams = await db.execute("SELECT * FROM exams");
@@ -47,7 +49,6 @@ async function initDB() {
 }
 initDB();
 
-// --- UPLOAD ROUTE (Handles both exam images and news images) ---
 app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -64,7 +65,6 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- EXAMS & PINS (Unchanged) ---
 app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
@@ -114,7 +114,6 @@ app.get('/api/admin/pins', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ENQUIRIES (Unchanged) ---
 app.post('/api/enquiries', async (req, res) => {
     try {
         const { name, email, phone, exam, message } = req.body;
@@ -127,7 +126,6 @@ app.get('/api/enquiries', async (req, res) => {
     try { const result = await db.execute("SELECT * FROM enquiries ORDER BY date DESC"); res.json(result.rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- VISITOR TRACKING & STATS ---
 app.post('/api/visitors', async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
@@ -146,11 +144,20 @@ app.get('/api/admin/stats', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- NEWS & UPDATES (Updated to accept imageUrl) ---
+// --- NEWS ROUTES ---
 app.post('/api/admin/news', async (req, res) => {
     try {
         const { title, content, imageUrl } = req.body;
         await db.execute({ sql: "INSERT INTO news (title, content, imageUrl, date) VALUES (?, ?, ?, ?)", args: [title, content, imageUrl || '', new Date().toISOString()] });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ⚠️ NEW: Edit/Update News Route
+app.put('/api/admin/news/:id', async (req, res) => {
+    try {
+        const { title, content, imageUrl } = req.body;
+        await db.execute({ sql: "UPDATE news SET title = ?, content = ?, imageUrl = ? WHERE id = ?", args: [title, content, imageUrl || '', req.params.id] });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
