@@ -1,3 +1,4 @@
+// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
 var dbExams = [];
@@ -6,6 +7,7 @@ var currentPackageType = null;
 var currentPrice = 0;
 const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Image+Not+Uploaded+Yet';
 
+// Log visitor on page load
 fetch(API_URL + '/visitors', { method: 'POST' }).catch(() => {});
 
 function getDeviceId() {
@@ -27,12 +29,62 @@ function copyDeviceId() {
     alert('Device ID Copied!');
 }
 
+// ⚠️ NEW: Save PIN to Local Storage
+function savePinLocally(pinData) {
+    let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
+    // Prevent duplicates
+    if(!history.some(p => p.pin === pinData.pin)) {
+        history.push(pinData);
+        localStorage.setItem('sa_my_pins', JSON.stringify(history));
+    }
+}
+
+// ⚠️ NEW: Load PINs into the "My PINs" page
+function loadMyPinHistory() {
+    var container = document.getElementById('pin-history-container');
+    if (!container) return;
+    container.innerHTML = '';
+    let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
+    
+    if (history.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:#666;">You have not purchased any PINs on this device yet.</p>';
+        return;
+    }
+
+    // Show newest first
+    history.reverse().forEach(item => {
+        const date = new Date(item.date).toLocaleDateString();
+        const subjects = item.subjects.join(', ');
+        const examName = item.examName || 'Unknown Exam';
+
+        container.innerHTML += `
+            <div style="background:white; border:1px solid #ddd; padding:15px; margin-bottom:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h4 style="color:var(--primary-blue); margin-bottom:5px;">${examName} <span style="font-size:12px; color:#666;">(${date})</span></h4>
+                    <p style="font-size:14px; color:#444;"><strong>Subjects:</strong> ${subjects}</p>
+                </div>
+                <div style="text-align:center;">
+                    <h3 style="color:green; letter-spacing:2px; margin-bottom:5px;">${item.pin}</h3>
+                    <button onclick="copyToClipboard('${item.pin}')" style="background:#25D366; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-size:12px;">Copy PIN</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text);
+    alert('PIN Copied: ' + text);
+}
+
 function showPage(pageId) {
     var mains = document.querySelectorAll('main');
     for(var i=0; i<mains.length; i++) mains[i].style.display = 'none';
     document.getElementById('page-' + pageId).style.display = 'block';
+    
     if(pageId === 'verify') displayDeviceId();
     if(pageId === 'updates') fetchNews();
+    if(pageId === 'history') loadMyPinHistory(); // Load history when clicking "My PINs"
 }
 
 function fetchExams() {
@@ -60,7 +112,6 @@ function renderExams() {
     });
 }
 
-// ⚠️ UPDATED: NEWS FETCHER (Shows images and makes links clickable) ⚠️
 function fetchNews() {
     var container = document.getElementById('news-container');
     container.innerHTML = 'Loading updates...';
@@ -96,8 +147,6 @@ function fetchNews() {
     })
     .catch(function() { container.innerHTML = '<p style="color:red; text-align:center;">Failed to load updates.</p>'; });
 }
-
-// ... (Keep your other functions: openExamPackages, openCheckout, updatePreviewAndLimit, limitSubjects, closeModal, payWithPaystack, generatePIN, verifyAndShowContent, enquiryForm) ...
 
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
@@ -182,7 +231,7 @@ function payWithPaystack() {
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
     var handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', 
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -193,6 +242,7 @@ function payWithPaystack() {
 function generatePIN(selectedSubjects) {
     closeModal('checkout-modal');
     var subjectNames = currentPackageType === 'all_subjects' ? currentExam.subjects.map(function(s) { return s.name; }) : selectedSubjects;
+    
     fetch(API_URL + '/pins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,6 +251,15 @@ function generatePIN(selectedSubjects) {
     .then(function(res) { return res.json(); })
     .then(function(data) {
         if (data.success) {
+            // ⚠️ SAVE TO LOCAL STORAGE HERE
+            savePinLocally({
+                pin: data.pin,
+                examId: currentExam._id,
+                examName: currentExam.name,
+                subjects: subjectNames,
+                date: new Date().toISOString()
+            });
+
             document.getElementById('generated-pin').innerText = data.pin;
             document.getElementById('success-modal').style.display = 'flex';
         }
