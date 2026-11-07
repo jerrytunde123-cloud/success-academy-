@@ -176,6 +176,7 @@
             let activeExam = null;
             let activeSubject = null;
             let currentReplyData = null;
+            let allNews = []; // Store news locally to fix the edit bug
 
             window.checkPassword = function() {
                 if(document.getElementById('admin-password').value === ADMIN_PASSWORD) {
@@ -293,7 +294,7 @@
                 const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Upload failed');
-                return data.imageUrls[0]; // Return the first URL
+                return data.imageUrls[0]; 
             }
 
             window.uploadThumbnail = async function() {
@@ -387,14 +388,24 @@
                 loadNews();
             }
 
-            window.editNews = function(id, title, content) {
+            // ⚠️ FIXED: Edit now fetches data directly from local memory, preventing quote errors
+            window.editNews = function(id) {
+                const item = allNews.find(n => n.id === id);
+                if(!item) return;
+
                 document.getElementById('edit-news-id').value = id;
-                document.getElementById('news-title').value = title;
-                document.getElementById('news-content').value = content;
+                document.getElementById('news-title').value = item.title;
+                document.getElementById('news-content').value = item.content;
                 document.getElementById('news-form-title').innerText = 'Edit Update';
                 document.getElementById('news-submit-btn').innerText = 'Update News';
                 document.getElementById('news-cancel-btn').style.display = 'inline-block';
                 window.scrollTo(0,0);
+            }
+
+            window.copyNewsLink = function(id) {
+                const url = `${window.location.origin}/#news-${id}`;
+                navigator.clipboard.writeText(url);
+                alert('Direct link copied: ' + url);
             }
 
             window.resetNewsForm = function() {
@@ -409,15 +420,14 @@
 
             async function loadNews() {
                 const res = await fetch(`${API_URL}/news`, { cache: "no-store" });
-                const news = await res.json();
+                allNews = await res.json(); // Store in local memory
                 const list = document.getElementById('news-list');
                 list.innerHTML = '';
-                if(news.length === 0) { list.innerHTML = '<p>No news yet.</p>'; return; }
+                if(allNews.length === 0) { list.innerHTML = '<p>No news yet.</p>'; return; }
                 
-                news.forEach(item => {
+                allNews.forEach(item => {
                     const date = new Date(item.date).toLocaleDateString();
                     
-                    // Loop through the images array
                     let imagesHtml = '';
                     if(item.images && item.images.length > 0) {
                         imagesHtml = '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">';
@@ -426,9 +436,6 @@
                         });
                         imagesHtml += '</div>';
                     }
-                    
-                    const safeTitle = item.title.replace(/'/g, "\\'");
-                    const safeContent = item.content.replace(/'/g, "\\'");
 
                     list.innerHTML += `
                         <div style="background:white; border:1px solid #ddd; padding:15px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-between;">
@@ -439,7 +446,8 @@
                                 ${imagesHtml}
                             </div>
                             <div style="display:flex; flex-direction:column; gap:5px;">
-                                <button onclick="editNews(${item.id}, '${safeTitle}', '${safeContent}')" style="background:#ffcc00; color:#001f5b; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-weight:bold;">Edit</button>
+                                <button onclick="editNews(${item.id})" style="background:#ffcc00; color:#001f5b; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-weight:bold;">Edit</button>
+                                <button onclick="copyNewsLink(${item.id})" style="background:#0088cc; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Copy Link</button>
                                 <button onclick="deleteNews(${item.id})" style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Delete</button>
                             </div>
                         </div>
