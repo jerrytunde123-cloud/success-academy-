@@ -129,18 +129,13 @@
     </div>
 
     <script>
-        window.onload = function() {
+                window.onload = function() {
             const ADMIN_PASSWORD = "admin123"; 
             const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
             
-            emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
-            const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
-            const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
-
             let exams = [];
             let activeExam = null;
             let activeSubject = null;
-            let currentReplyData = null;
 
             window.checkPassword = function() {
                 if(document.getElementById('admin-password').value === ADMIN_PASSWORD) {
@@ -175,7 +170,6 @@
                     exams = await res.json();
                     select.innerHTML = '<option value="">-- Select Exam --</option>';
                     exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
-                    
                     const manualSelect = document.getElementById('manual-exam-select');
                     manualSelect.innerHTML = '';
                     exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
@@ -237,53 +231,29 @@
 
             window.saveConfig = async function() {
                 const updatedData = {
-                    prices: {
-                        per_subject: Number(document.getElementById('price-per-subject').value),
-                        per_dept: Number(document.getElementById('price-per-dept').value),
-                        all_subjects: Number(document.getElementById('price-all-subjects').value)
-                    },
-                    allow: {
-                        per_subject: document.getElementById('allow-per-subject').checked,
-                        per_dept: document.getElementById('allow-per-dept').checked,
-                        all_subjects: document.getElementById('allow-all').checked
-                    }
+                    prices: { per_subject: Number(document.getElementById('price-per-subject').value), per_dept: Number(document.getElementById('price-per-dept').value), all_subjects: Number(document.getElementById('price-all-subjects').value) },
+                    allow: { per_subject: document.getElementById('allow-per-subject').checked, per_dept: document.getElementById('allow-per-dept').checked, all_subjects: document.getElementById('allow-all').checked }
                 };
                 await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
                 alert('Prices Updated!');
             }
 
-            // ⚠️ IMAGE COMPRESSION LOGIC TO PREVENT RENDER CRASH ⚠️
-            function getBase64(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = (event) => {
-                        const img = new Image();
-                        img.src = event.target.result;
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const MAX_WIDTH = 800; // Resize to max 800px wide
-                            const scaleSize = MAX_WIDTH / img.width;
-                            canvas.width = MAX_WIDTH;
-                            canvas.height = img.height * scaleSize;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            
-                            // Compress to JPEG with 0.6 quality (Reduces file size by ~90%)
-                            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                            resolve(dataUrl);
-                        };
-                    };
-                    reader.onerror = error => reject(error);
-                });
+            // ⚠️ NEW UPLOAD LOGIC (Direct to R2) ⚠️
+            async function uploadFileToR2(file) {
+                const formData = new FormData();
+                formData.append('image', file);
+                const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Upload failed');
+                return data.imageUrl;
             }
 
             window.uploadThumbnail = async function() {
                 const fileInput = document.getElementById('thumbnail-upload');
                 if (fileInput.files.length === 0) return alert('Select an image first.');
                 try {
-                    const base64Img = await getBase64(fileInput.files[0]);
-                    activeSubject.thumbnail = base64Img;
+                    const imageUrl = await uploadFileToR2(fileInput.files[0]);
+                    activeSubject.thumbnail = imageUrl;
                     await saveActiveSubjectToDB();
                     alert('Thumbnail Uploaded!');
                     fileInput.value = '';
@@ -297,12 +267,12 @@
                 let currentQA = activeSubject.qaImages || [];
                 if(currentQA.length + fileInput.files.length > 25) return alert('Max 25 images.');
                 try {
-                    let newBase64Images = [];
+                    let newUrls = [];
                     for(let i=0; i<fileInput.files.length; i++) {
-                        const b64 = await getBase64(fileInput.files[i]);
-                        newBase64Images.push(b64);
+                        const url = await uploadFileToR2(fileInput.files[i]);
+                        newUrls.push(url);
                     }
-                    activeSubject.qaImages = [...currentQA, ...newBase64Images];
+                    activeSubject.qaImages = [...currentQA, ...newUrls];
                     await saveActiveSubjectToDB();
                     alert('Q&A Images Uploaded!');
                     fileInput.value = '';
@@ -317,27 +287,14 @@
             }
 
             async function saveActiveSubjectToDB() {
-                console.log("Sending to DB:", activeSubject);
                 const payload = { subjects: activeExam.subjects };
-
                 try {
-                    const response = await fetch(`${API_URL}/exams/${activeExam._id}`, { 
-                        method: 'PUT', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(payload) 
-                    });
-                    
-                    if (!response.ok) {
-                        const errData = await response.json();
-                        throw new Error(errData.error || "Failed to update");
-                    }
-                    console.log("Successfully saved to DB!");
-                } catch (error) {
-                    console.error("Failed to save:", error);
-                    alert("Failed to save to server: " + error.message);
-                }
+                    const response = await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error("Failed to update");
+                } catch (error) { alert("Failed to save: " + error.message); }
             }
 
+            // Keep loadPinHistory, loadManualSubjects, generateManualPin, loadEnquiries as they were...
             async function loadPinHistory() {
                 const res = await fetch(`${API_URL}/admin/pins`, { cache: "no-store" });
                 const pins = await res.json();
@@ -354,9 +311,7 @@
                 const area = document.getElementById('manual-subjects-area');
                 area.innerHTML = '';
                 if(!exam) return;
-                exam.subjects.forEach(sub => {
-                    area.innerHTML += `<label style="display:block; margin-bottom:5px;"><input type="checkbox" name="manual-sub" value="${sub.name}"> ${sub.name}</label>`;
-                });
+                exam.subjects.forEach(sub => { area.innerHTML += `<label style="display:block; margin-bottom:5px;"><input type="checkbox" name="manual-sub" value="${sub.name}"> ${sub.name}</label>`; });
             }
 
             window.generateManualPin = async function() {
@@ -365,24 +320,13 @@
                 const customPin = document.getElementById('manual-pin-input').value.trim();
                 const checked = document.querySelectorAll('input[name="manual-sub"]:checked');
                 const subjects = Array.from(checked).map(cb => cb.value);
-
                 if(!deviceId) return alert('Device ID is required.');
                 if(subjects.length === 0) return alert('Select at least one subject.');
                 if(!customPin) return alert('Enter a custom PIN.');
-
                 try {
-                    const res = await fetch(`${API_URL}/pins`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ examId, subjects, deviceId, manualPin: customPin })
-                    });
+                    const res = await fetch(`${API_URL}/pins`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ examId, subjects, deviceId, manualPin: customPin }) });
                     const data = await res.json();
-                    if(data.success) {
-                        alert(`PIN Generated Successfully: ${data.pin}`);
-                        loadPinHistory(); 
-                    } else {
-                        alert(data.error);
-                    }
+                    if(data.success) { alert(`PIN Generated: ${data.pin}`); loadPinHistory(); } else { alert(data.error); }
                 } catch (e) { alert('Error generating PIN.'); }
             }
 
@@ -397,30 +341,13 @@
             }
 
             window.openReply = function(name, email) {
-                currentReplyData = { name, email };
                 document.getElementById('reply-name').innerText = name;
                 document.getElementById('reply-message').value = '';
                 document.getElementById('email-status').innerText = '';
                 document.getElementById('reply-modal').style.display = 'flex';
             }
-
             window.closeModal = function() { document.getElementById('reply-modal').style.display = 'none'; }
-
-            window.sendEmailReply = async function() {
-                const msg = document.getElementById('reply-message').value;
-                const status = document.getElementById('email-status');
-                if(!msg) return alert('Type a message');
-                status.innerText = 'Sending...';
-                const templateParams = { to_name: currentReplyData.name, to_email: currentReplyData.email, reply_message: msg };
-                try {
-                    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
-                    status.innerText = 'Email Sent Successfully!';
-                    setTimeout(closeModal, 2000);
-                } catch (error) {
-                    status.style.color = 'red';
-                    status.innerText = 'Failed to send email.';
-                }
-            }
+            // (Add your EmailJS sendEmailReply function here)
 
             if(localStorage.getItem('sa_admin_logged_in') === 'true') {
                 document.getElementById('login-screen').style.display = 'none';
