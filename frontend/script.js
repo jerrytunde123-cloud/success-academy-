@@ -1,4 +1,3 @@
-// ⚠️ REPLACE THIS WITH YOUR LIVE RENDER URL
 const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
 
 var dbExams = [];
@@ -7,7 +6,6 @@ var currentPackageType = null;
 var currentPrice = 0;
 const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Image+Not+Uploaded+Yet';
 
-// ⚠️ LOG VISITOR ON PAGE LOAD
 fetch(API_URL + '/visitors', { method: 'POST' }).catch(() => {});
 
 function getDeviceId() {
@@ -62,6 +60,7 @@ function renderExams() {
     });
 }
 
+// ⚠️ UPDATED: NEWS FETCHER (Shows images and makes links clickable) ⚠️
 function fetchNews() {
     var container = document.getElementById('news-container');
     container.innerHTML = 'Loading updates...';
@@ -75,17 +74,30 @@ function fetchNews() {
         }
         data.forEach(function(item) {
             var date = new Date(item.date).toLocaleDateString();
+            
+            // Convert URLs in text to clickable links
+            var linkedContent = item.content.replace(
+                /(https?:\/\/[^\s]+)/g, 
+                '<a href="$1" target="_blank" style="color:#0088cc; text-decoration:underline; word-break:break-all;">$1</a>'
+            );
+
+            // Display image if one was uploaded
+            var imageHtml = item.imageUrl ? `<img src="${item.imageUrl}" style="max-width:100%; border-radius:8px; margin:15px 0; display:block;">` : '';
+            
             container.innerHTML += `
-                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--accent-yellow);">
+                <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--accent-yellow);">
                     <h3 style="color:var(--primary-blue); margin-bottom:5px;">${item.title}</h3>
                     <p style="font-size:12px; color:#888; margin-bottom:15px;">${date}</p>
-                    <p style="white-space:pre-wrap; color:#333;">${item.content}</p>
+                    ${imageHtml}
+                    <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${linkedContent}</p>
                 </div>
             `;
         });
     })
     .catch(function() { container.innerHTML = '<p style="color:red; text-align:center;">Failed to load updates.</p>'; });
 }
+
+// ... (Keep your other functions: openExamPackages, openCheckout, updatePreviewAndLimit, limitSubjects, closeModal, payWithPaystack, generatePIN, verifyAndShowContent, enquiryForm) ...
 
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
@@ -241,16 +253,13 @@ function verifyAndShowContent() {
         
         answersDiv.innerHTML = '<pre style="font-family:monospace; white-space:pre-wrap; margin-bottom:20px; color:black; font-size:16px;">' + contentText + '</pre>';
         
-        // ⚠️ FIXED IMAGE RENDERING ⚠️
         if (pinData.subjects && examInfo && examInfo.subjects) {
             pinData.subjects.forEach(function(subName) {
                 var subjectData = examInfo.subjects.find(function(s) { return s.name === subName; });
                 if (subjectData && subjectData.qaImages && subjectData.qaImages.length > 0) {
                     answersDiv.innerHTML += '<h4 style="margin-top:15px; color:var(--primary-blue);">' + subName + ' Images:</h4><div style="display:flex; flex-wrap:wrap; gap:10px;">';
                     subjectData.qaImages.forEach(function(imgUrl) {
-                        // Ensure we handle Base64 strings properly
-                        var imgSource = imgUrl.startsWith('data:image') ? imgUrl : imgUrl;
-                        answersDiv.innerHTML += '<img src="' + imgSource + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
+                        answersDiv.innerHTML += '<img src="' + imgUrl + '" style="max-width:100%; border-radius:5px; border:1px solid #ddd;">';
                     });
                     answersDiv.innerHTML += '</div>';
                 }
