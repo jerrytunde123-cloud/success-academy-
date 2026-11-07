@@ -31,7 +31,6 @@ function copyDeviceId() {
 
 function savePinLocally(pinData) {
     let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
-    // Prevent duplicates
     if(!history.some(p => p.pin === pinData.pin)) {
         history.push(pinData);
         localStorage.setItem('sa_my_pins', JSON.stringify(history));
@@ -49,7 +48,6 @@ function loadMyPinHistory() {
         return;
     }
 
-    // Show newest first
     history.reverse().forEach(item => {
         const date = new Date(item.date).toLocaleDateString();
         const subjects = item.subjects.join(', ');
@@ -110,12 +108,11 @@ function renderExams() {
     });
 }
 
-// ⚠️ UPDATED: Truncates text, adds Read More button, and checks for shared link
+// ⚠️ FIXED: Truncates text to 80 characters, always adds Read More button
 function fetchNews() {
     var container = document.getElementById('news-container');
     container.innerHTML = 'Loading updates...';
     
-    // Check if the URL has a specific news ID (e.g., #news-5)
     var hash = window.location.hash;
     var targetNewsId = null;
     if (hash && hash.startsWith('#news-')) {
@@ -134,17 +131,15 @@ function fetchNews() {
         data.forEach(function(item) {
             var date = new Date(item.date).toLocaleDateString();
             
-            // Convert URLs in text to clickable links
             var linkedContent = item.content.replace(
                 /(https?:\/\/[^\s]+)/g, 
                 '<a href="$1" target="_blank" style="color:#0088cc; text-decoration:underline; word-break:break-all;">$1</a>'
             );
 
-            // Check if text is longer than 150 characters
-            var isLong = item.content.length > 150;
-            var shortContent = isLong ? linkedContent.substring(0, 150) + '...' : linkedContent;
+            // ⚠️ CHANGED: Truncate to 80 characters instead of 150
+            var isLong = true; 
+            var shortContent = linkedContent.substring(0, 80) + '...';
 
-            // Loop through images array
             var imagesHtml = '';
             if (item.images && item.images.length > 0) {
                 imagesHtml = '<div style="display:flex; flex-wrap:wrap; gap:10px; margin:15px 0;">';
@@ -154,7 +149,6 @@ function fetchNews() {
                 imagesHtml += '</div>';
             }
 
-            // If this specific news is opened via link, show it expanded
             var isTarget = (targetNewsId === item.id);
             var displayStyle = isTarget ? 'block' : 'none';
             
@@ -165,13 +159,13 @@ function fetchNews() {
                     
                     <div id="short-${item.id}" style="display: ${isTarget ? 'none' : 'block'};">
                         <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${shortContent}</p>
-                        ${isLong ? `<button onclick="expandNews(${item.id})" style="background:none; border:none; color:var(--primary-blue); font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Read More →</button>` : ''}
+                        <button onclick="expandNews(${item.id})" style="background:none; border:none; color:var(--primary-blue); font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Read More →</button>
                     </div>
 
                     <div id="full-${item.id}" style="display: ${displayStyle};">
                         ${imagesHtml}
                         <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${linkedContent}</p>
-                        ${isLong ? `<button onclick="collapseNews(${item.id})" style="background:none; border:none; color:red; font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Show Less ↑</button>` : ''}
+                        <button onclick="collapseNews(${item.id})" style="background:none; border:none; color:red; font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Show Less ↑</button>
                     </div>
                 </div>
             `;
@@ -180,7 +174,6 @@ function fetchNews() {
     .catch(function() { container.innerHTML = '<p style="color:red; text-align:center;">Failed to load updates.</p>'; });
 }
 
-// Functions to toggle the news text
 window.expandNews = function(id) {
     document.getElementById('short-' + id).style.display = 'none';
     document.getElementById('full-' + id).style.display = 'block';
@@ -274,7 +267,7 @@ function payWithPaystack() {
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
     var handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', 
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
