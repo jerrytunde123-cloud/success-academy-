@@ -30,8 +30,6 @@
         .image-thumbnail { position: relative; width: 100px; height: 100px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; }
         .image-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
         .delete-img-btn { position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; }
-        
-        /* Stats Dashboard Styling */
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .stat-box { background: #001f5b; color: white; padding: 20px; border-radius: 8px; text-align: center; }
         .stat-box h2 { margin: 0; font-size: 32px; color: var(--accent-yellow); }
@@ -40,7 +38,6 @@
 </head>
 <body>
 
-    <!-- LOGIN SCREEN -->
     <div id="login-screen" class="login-box">
         <h2 style="color:#001f5b;">Admin Login</h2>
         <input type="password" id="admin-password" placeholder="Enter Password">
@@ -48,27 +45,16 @@
         <p id="login-error" style="color:red; display:none; margin-top:10px;">Incorrect Password!</p>
     </div>
 
-    <!-- MAIN DASHBOARD -->
     <div id="dashboard" class="container">
         <div class="header">
             <h1>Admin Dashboard</h1>
             <button onclick="logout()" style="background:#ff4444; color:white; padding:10px; border-radius:5px; border:none; cursor:pointer;">Log Out</button>
         </div>
 
-        <!-- LIVE TRAFFIC STATS -->
         <div class="stats-grid">
-            <div class="stat-box">
-                <h2 id="stat-today">0</h2>
-                <p>Visitors Today</p>
-            </div>
-            <div class="stat-box">
-                <h2 id="stat-total">0</h2>
-                <p>Total Visitors</p>
-            </div>
-            <div class="stat-box">
-                <h2 id="stat-pins">0</h2>
-                <p>Total PINs Sold</p>
-            </div>
+            <div class="stat-box"><h2 id="stat-today">0</h2><p>Visitors Today</p></div>
+            <div class="stat-box"><h2 id="stat-total">0</h2><p>Total Visitors</p></div>
+            <div class="stat-box"><h2 id="stat-pins">0</h2><p>Total PINs Sold</p></div>
         </div>
 
         <div class="tabs">
@@ -78,7 +64,6 @@
             <button class="tab" onclick="switchTab('enquiries', event)">Enquiries</button>
         </div>
 
-        <!-- EXAMS TAB -->
         <div id="tab-exams" class="section active">
             <select id="exam-select" onchange="loadExamConfig()">
                 <option value="">-- Select Exam --</option>
@@ -119,7 +104,6 @@
             </div>
         </div>
 
-        <!-- PINS TAB -->
         <div id="tab-pins" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3>Generate Manual PIN</h3>
@@ -136,19 +120,23 @@
             </table>
         </div>
 
-        <!-- NEWS TAB -->
+        <!-- UPDATED NEWS TAB -->
         <div id="tab-news" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3>Publish New Update</h3>
                 <input type="text" id="news-title" placeholder="Title (e.g., WAEC Timetable Released)">
                 <textarea id="news-content" rows="5" placeholder="Write your update here..."></textarea>
-                <button class="save-btn" onclick="publishNews()">Publish Update</button>
+                
+                <label style="display:block; margin-top:10px; font-weight:bold;">Upload News Image (Optional):</label>
+                <input type="file" id="news-image-upload" accept="image/*">
+                <div id="news-image-preview" style="margin-top:10px;"></div>
+                
+                <button class="save-btn" style="margin-top:10px;" onclick="publishNews()">Publish Update</button>
             </div>
             <h3>Published Updates</h3>
             <div id="news-list"></div>
         </div>
 
-        <!-- ENQUIRIES TAB -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
@@ -158,7 +146,6 @@
         </div>
     </div>
 
-    <!-- REPLY MODAL -->
     <div id="reply-modal" class="modal">
         <div class="modal-content">
             <h3>Reply to <span id="reply-name"></span></h3>
@@ -210,16 +197,14 @@
             };
 
             async function initDashboard() {
-                // Fetch Live Stats
                 try {
                     const statRes = await fetch(`${API_URL}/admin/stats`, { cache: "no-store" });
                     const stats = await statRes.json();
                     document.getElementById('stat-today').innerText = stats.todayVisitors;
                     document.getElementById('stat-total').innerText = stats.totalVisitors;
                     document.getElementById('stat-pins').innerText = stats.totalPinsSold;
-                } catch(e) { console.log("Stats failed to load"); }
+                } catch(e) {}
 
-                // Fetch Exams
                 var select = document.getElementById('exam-select');
                 select.innerHTML = '<option value="">-- Waking up server... --</option>';
                 try {
@@ -227,7 +212,6 @@
                     exams = await res.json();
                     select.innerHTML = '<option value="">-- Select Exam --</option>';
                     exams.forEach(exam => { select.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
-                    
                     const manualSelect = document.getElementById('manual-exam-select');
                     manualSelect.innerHTML = '';
                     exams.forEach(exam => { manualSelect.innerHTML += `<option value="${exam._id}">${exam.name}</option>`; });
@@ -289,16 +273,8 @@
 
             window.saveConfig = async function() {
                 const updatedData = {
-                    prices: {
-                        per_subject: Number(document.getElementById('price-per-subject').value),
-                        per_dept: Number(document.getElementById('price-per-dept').value),
-                        all_subjects: Number(document.getElementById('price-all-subjects').value)
-                    },
-                    allow: {
-                        per_subject: document.getElementById('allow-per-subject').checked,
-                        per_dept: document.getElementById('allow-per-dept').checked,
-                        all_subjects: document.getElementById('allow-all').checked
-                    }
+                    prices: { per_subject: Number(document.getElementById('price-per-subject').value), per_dept: Number(document.getElementById('price-per-dept').value), all_subjects: Number(document.getElementById('price-all-subjects').value) },
+                    allow: { per_subject: document.getElementById('allow-per-subject').checked, per_dept: document.getElementById('allow-per-dept').checked, all_subjects: document.getElementById('allow-all').checked }
                 };
                 await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedData) });
                 alert('Prices Updated!');
@@ -354,34 +330,40 @@
             async function saveActiveSubjectToDB() {
                 const payload = { subjects: activeExam.subjects };
                 try {
-                    const response = await fetch(`${API_URL}/exams/${activeExam._id}`, { 
-                        method: 'PUT', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(payload) 
-                    });
-                    if (!response.ok) {
-                        const errData = await response.json();
-                        throw new Error(errData.error || "Failed to update");
-                    }
-                } catch (error) {
-                    alert("Failed to save to server: " + error.message);
-                }
+                    const response = await fetch(`${API_URL}/exams/${activeExam._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error("Failed to update");
+                } catch (error) { alert("Failed to save: " + error.message); }
             }
 
             // --- NEWS FUNCTIONS ---
             window.publishNews = async function() {
                 const title = document.getElementById('news-title').value;
                 const content = document.getElementById('news-content').value;
+                const imageFile = document.getElementById('news-image-upload').files[0];
+                
                 if(!title || !content) return alert('Title and Content are required.');
                 
+                let imageUrl = '';
+                if(imageFile) {
+                    try {
+                        document.querySelector('#tab-news .save-btn').innerText = 'Uploading Image...';
+                        imageUrl = await uploadFileToR2(imageFile);
+                    } catch(e) {
+                        return alert('Image upload failed: ' + e.message);
+                    }
+                }
+
                 await fetch(`${API_URL}/admin/news`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, content })
+                    body: JSON.stringify({ title, content, imageUrl })
                 });
+                
                 alert('News Published!');
                 document.getElementById('news-title').value = '';
                 document.getElementById('news-content').value = '';
+                document.getElementById('news-image-upload').value = '';
+                document.querySelector('#tab-news .save-btn').innerText = 'Publish Update';
                 loadNews();
             }
 
@@ -394,12 +376,15 @@
                 
                 news.forEach(item => {
                     const date = new Date(item.date).toLocaleDateString();
+                    let imageHtml = item.imageUrl ? `<img src="${item.imageUrl}" style="max-width:100%; border-radius:5px; margin-top:10px;">` : '';
+                    
                     list.innerHTML += `
                         <div style="background:white; border:1px solid #ddd; padding:15px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-between;">
-                            <div>
+                            <div style="width: 90%;">
                                 <h4 style="margin:0 0 5px 0; color:#001f5b;">${item.title}</h4>
                                 <p style="font-size:12px; color:#888; margin:0 0 10px 0;">${date}</p>
                                 <p style="margin:0; white-space:pre-wrap;">${item.content}</p>
+                                ${imageHtml}
                             </div>
                             <button onclick="deleteNews(${item.id})" style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; height:30px;">Delete</button>
                         </div>
@@ -453,12 +438,7 @@
                         body: JSON.stringify({ examId, subjects, deviceId, manualPin: customPin })
                     });
                     const data = await res.json();
-                    if(data.success) {
-                        alert(`PIN Generated Successfully: ${data.pin}`);
-                        loadPinHistory(); 
-                    } else {
-                        alert(data.error);
-                    }
+                    if(data.success) { alert(`PIN Generated: ${data.pin}`); loadPinHistory(); } else { alert(data.error); }
                 } catch (e) { alert('Error generating PIN.'); }
             }
 
