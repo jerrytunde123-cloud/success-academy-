@@ -29,7 +29,6 @@ function copyDeviceId() {
     alert('Device ID Copied!');
 }
 
-// ⚠️ NEW: Save PIN to Local Storage
 function savePinLocally(pinData) {
     let history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
     // Prevent duplicates
@@ -39,7 +38,6 @@ function savePinLocally(pinData) {
     }
 }
 
-// ⚠️ NEW: Load PINs into the "My PINs" page
 function loadMyPinHistory() {
     var container = document.getElementById('pin-history-container');
     if (!container) return;
@@ -84,7 +82,7 @@ function showPage(pageId) {
     
     if(pageId === 'verify') displayDeviceId();
     if(pageId === 'updates') fetchNews();
-    if(pageId === 'history') loadMyPinHistory(); // Load history when clicking "My PINs"
+    if(pageId === 'history') loadMyPinHistory(); 
 }
 
 function fetchExams() {
@@ -112,6 +110,7 @@ function renderExams() {
     });
 }
 
+// ⚠️ FIXED: Displays multiple images for News
 function fetchNews() {
     var container = document.getElementById('news-container');
     container.innerHTML = 'Loading updates...';
@@ -132,14 +131,21 @@ function fetchNews() {
                 '<a href="$1" target="_blank" style="color:#0088cc; text-decoration:underline; word-break:break-all;">$1</a>'
             );
 
-            // Display image if one was uploaded
-            var imageHtml = item.imageUrl ? `<img src="${item.imageUrl}" style="max-width:100%; border-radius:8px; margin:15px 0; display:block;">` : '';
+            // Loop through images array
+            var imagesHtml = '';
+            if (item.images && item.images.length > 0) {
+                imagesHtml = '<div style="display:flex; flex-wrap:wrap; gap:10px; margin:15px 0;">';
+                item.images.forEach(img => {
+                    imagesHtml += `<img src="${img}" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid #ddd;">`;
+                });
+                imagesHtml += '</div>';
+            }
             
             container.innerHTML += `
                 <div style="background:white; padding:20px; border-radius:10px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--accent-yellow);">
                     <h3 style="color:var(--primary-blue); margin-bottom:5px;">${item.title}</h3>
                     <p style="font-size:12px; color:#888; margin-bottom:15px;">${date}</p>
-                    ${imageHtml}
+                    ${imagesHtml}
                     <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${linkedContent}</p>
                 </div>
             `;
@@ -251,7 +257,6 @@ function generatePIN(selectedSubjects) {
     .then(function(res) { return res.json(); })
     .then(function(data) {
         if (data.success) {
-            // ⚠️ SAVE TO LOCAL STORAGE HERE
             savePinLocally({
                 pin: data.pin,
                 examId: currentExam._id,
