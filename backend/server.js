@@ -30,8 +30,8 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
     
-    // NEW TABLES: News and Visitors
-    await db.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, date TEXT);`);
+    // Added imageUrl to the news table
+    await db.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, imageUrl TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
     
     const exams = await db.execute("SELECT * FROM exams");
@@ -47,12 +47,12 @@ async function initDB() {
 }
 initDB();
 
-// --- R2 UPLOAD ---
+// --- UPLOAD ROUTE (Handles both exam images and news images) ---
 app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         const fileExtension = req.file.originalname.split('.').pop();
-        const fileName = `exam-images/${Date.now()}-${Math.round(Math.random() * 1E9)}.${fileExtension}`;
+        const fileName = `uploads/${Date.now()}-${Math.round(Math.random() * 1E9)}.${fileExtension}`;
         const command = new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: fileName,
@@ -64,7 +64,7 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- EXAMS & PINS (UNCHANGED) ---
+// --- EXAMS & PINS (Unchanged) ---
 app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
@@ -114,7 +114,7 @@ app.get('/api/admin/pins', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ENQUIRIES (UNCHANGED) ---
+// --- ENQUIRIES (Unchanged) ---
 app.post('/api/enquiries', async (req, res) => {
     try {
         const { name, email, phone, exam, message } = req.body;
@@ -127,10 +127,10 @@ app.get('/api/enquiries', async (req, res) => {
     try { const result = await db.execute("SELECT * FROM enquiries ORDER BY date DESC"); res.json(result.rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- NEW: VISITOR TRACKING & STATS ---
+// --- VISITOR TRACKING & STATS ---
 app.post('/api/visitors', async (req, res) => {
     try {
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const today = new Date().toISOString().split('T')[0];
         await db.execute({ sql: "INSERT INTO visitors (date) VALUES (?)", args: [today] });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -142,36 +142,25 @@ app.get('/api/admin/stats', async (req, res) => {
         const todayRes = await db.execute({ sql: "SELECT COUNT(*) as count FROM visitors WHERE date = ?", args: [today] });
         const totalRes = await db.execute("SELECT COUNT(*) as count FROM visitors");
         const pinsRes = await db.execute("SELECT COUNT(*) as count FROM pins");
-        
-        res.json({
-            todayVisitors: todayRes.rows[0].count,
-            totalVisitors: totalRes.rows[0].count,
-            totalPinsSold: pinsRes.rows[0].count
-        });
+        res.json({ todayVisitors: todayRes.rows[0].count, totalVisitors: totalRes.rows[0].count, totalPinsSold: pinsRes.rows[0].count });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- NEW: NEWS & UPDATES ---
+// --- NEWS & UPDATES (Updated to accept imageUrl) ---
 app.post('/api/admin/news', async (req, res) => {
     try {
-        const { title, content } = req.body;
-        await db.execute({ sql: "INSERT INTO news (title, content, date) VALUES (?, ?, ?)", args: [title, content, new Date().toISOString()] });
+        const { title, content, imageUrl } = req.body;
+        await db.execute({ sql: "INSERT INTO news (title, content, imageUrl, date) VALUES (?, ?, ?, ?)", args: [title, content, imageUrl || '', new Date().toISOString()] });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/news', async (req, res) => {
-    try {
-        const result = await db.execute("SELECT * FROM news ORDER BY date DESC");
-        res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    try { const result = await db.execute("SELECT * FROM news ORDER BY date DESC"); res.json(result.rows); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/admin/news/:id', async (req, res) => {
-    try {
-        await db.execute({ sql: "DELETE FROM news WHERE id = ?", args: [req.params.id] });
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    try { await db.execute({ sql: "DELETE FROM news WHERE id = ?", args: [req.params.id] }); res.json({ success: true }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = process.env.PORT || 5000;
