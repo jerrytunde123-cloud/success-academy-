@@ -64,6 +64,7 @@
             <button class="tab" onclick="switchTab('enquiries', event)">Enquiries</button>
         </div>
 
+        <!-- EXAMS TAB -->
         <div id="tab-exams" class="section active">
             <select id="exam-select" onchange="loadExamConfig()">
                 <option value="">-- Select Exam --</option>
@@ -104,6 +105,7 @@
             </div>
         </div>
 
+        <!-- PINS TAB -->
         <div id="tab-pins" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3>Generate Manual PIN</h3>
@@ -120,7 +122,7 @@
             </table>
         </div>
 
-        <!-- UPDATED NEWS TAB -->
+        <!-- NEWS TAB -->
         <div id="tab-news" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3 id="news-form-title">Publish New Update</h3>
@@ -128,8 +130,8 @@
                 <input type="text" id="news-title" placeholder="Title (e.g., WAEC Timetable Released)">
                 <textarea id="news-content" rows="5" placeholder="Write your update here..."></textarea>
                 
-                <label style="display:block; margin-top:10px; font-weight:bold;">Upload News Image (Optional):</label>
-                <input type="file" id="news-image-upload" accept="image/*">
+                <label style="display:block; margin-top:10px; font-weight:bold;">Upload News Images (Optional, Max 5):</label>
+                <input type="file" id="news-image-upload" accept="image/*" multiple>
                 
                 <div style="margin-top:10px;">
                     <button id="news-submit-btn" class="save-btn" onclick="saveNews()">Publish Update</button>
@@ -140,6 +142,7 @@
             <div id="news-list"></div>
         </div>
 
+        <!-- ENQUIRIES TAB -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
@@ -149,6 +152,7 @@
         </div>
     </div>
 
+    <!-- REPLY MODAL -->
     <div id="reply-modal" class="modal">
         <div class="modal-content">
             <h3>Reply to <span id="reply-name"></span></h3>
@@ -285,11 +289,11 @@
 
             async function uploadFileToR2(file) {
                 const formData = new FormData();
-                formData.append('image', file);
+                formData.append('images', file);
                 const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Upload failed');
-                return data.imageUrl;
+                return data.imageUrls[0]; // Return the first URL
             }
 
             window.uploadThumbnail = async function() {
@@ -338,22 +342,33 @@
                 } catch (error) { alert("Failed to save: " + error.message); }
             }
 
-            // --- NEWS FUNCTIONS (Publish & Edit) ---
+            // --- NEWS FUNCTIONS ---
             window.saveNews = async function() {
                 const id = document.getElementById('edit-news-id').value;
                 const title = document.getElementById('news-title').value;
                 const content = document.getElementById('news-content').value;
-                const imageFile = document.getElementById('news-image-upload').files[0];
+                const fileInput = document.getElementById('news-image-upload');
                 const btn = document.getElementById('news-submit-btn');
                 
                 if(!title || !content) return alert('Title and Content are required.');
                 
-                let imageUrl = '';
-                if(imageFile) {
+                let imageUrls = [];
+                if(fileInput.files.length > 0) {
+                    if (fileInput.files.length > 5) return alert('You can only upload up to 5 images at once.');
                     try {
-                        btn.innerText = 'Uploading Image...';
-                        imageUrl = await uploadFileToR2(imageFile);
-                    } catch(e) { return alert('Image upload failed: ' + e.message); }
+                        btn.innerText = 'Uploading Images...';
+                        const formData = new FormData();
+                        for(let i=0; i<fileInput.files.length; i++) {
+                            formData.append('images', fileInput.files[i]);
+                        }
+                        const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if(!res.ok) throw new Error(data.error);
+                        imageUrls = data.imageUrls;
+                    } catch(e) { 
+                        btn.innerText = id ? 'Update News' : 'Publish Update';
+                        return alert('Image upload failed: ' + e.message); 
+                    }
                 }
 
                 btn.innerText = id ? 'Updating...' : 'Publishing...';
@@ -364,7 +379,7 @@
                 await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, content, imageUrl })
+                    body: JSON.stringify({ title, content, images: imageUrls })
                 });
                 
                 alert(id ? 'News Updated!' : 'News Published!');
@@ -401,9 +416,17 @@
                 
                 news.forEach(item => {
                     const date = new Date(item.date).toLocaleDateString();
-                    let imageHtml = item.imageUrl ? `<img src="${item.imageUrl}" style="max-width:100%; border-radius:5px; margin-top:10px;">` : '';
                     
-                    // Safely escape quotes for the edit function
+                    // Loop through the images array
+                    let imagesHtml = '';
+                    if(item.images && item.images.length > 0) {
+                        imagesHtml = '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">';
+                        item.images.forEach(img => {
+                            imagesHtml += `<img src="${img}" style="max-height:100px; border-radius:5px; border:1px solid #ddd;">`;
+                        });
+                        imagesHtml += '</div>';
+                    }
+                    
                     const safeTitle = item.title.replace(/'/g, "\\'");
                     const safeContent = item.content.replace(/'/g, "\\'");
 
@@ -413,7 +436,7 @@
                                 <h4 style="margin:0 0 5px 0; color:#001f5b;">${item.title}</h4>
                                 <p style="font-size:12px; color:#888; margin:0 0 10px 0;">${date}</p>
                                 <p style="margin:0; white-space:pre-wrap;">${item.content}</p>
-                                ${imageHtml}
+                                ${imagesHtml}
                             </div>
                             <div style="display:flex; flex-direction:column; gap:5px;">
                                 <button onclick="editNews(${item.id}, '${safeTitle}', '${safeContent}')" style="background:#ffcc00; color:#001f5b; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-weight:bold;">Edit</button>
