@@ -6,7 +6,7 @@ const { createClient } = require('@libsql/client');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Reduced limit, no more Base64!
+app.use(express.json({ limit: '10mb' }));
 
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -22,7 +22,7 @@ const s3 = new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
 });
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const FULL_SUBJECT_LIST = ["English Language", "Mathematics", "Biology", "Chemistry", "Physics", "Economics", "Commerce", "Principles of Accounts", "Literature-in-English", "Government", "Geography", "History", "Christian Religious Studies", "Islamic Religious Studies", "Computer Studies", "Agricultural Science", "Hausa", "Igbo", "Yoruba", "French", "Arabic", "Home Economics", "Physical and Health Education", "Art", "Music", "Civic Education"];
 
@@ -31,7 +31,6 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
     
-    // We no longer drop the table here, to preserve your data
     const exams = await db.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
         const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
@@ -45,33 +44,25 @@ async function initDB() {
 }
 initDB();
 
-// --- R2 UPLOAD ROUTE ---
 app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        
         const fileExtension = req.file.originalname.split('.').pop();
         const fileName = `exam-images/${Date.now()}-${Math.round(Math.random() * 1E9)}.${fileExtension}`;
-        
         const command = new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: fileName,
             Body: req.file.buffer,
             ContentType: req.file.mimetype,
         });
-        
         await s3.send(command);
-        
-        // Return the public URL
-        const publicUrl = `${process.env.R2_PUBLIC_URL}/${fileName}`;
-        res.json({ imageUrl: publicUrl });
+        res.json({ imageUrl: `${process.env.R2_PUBLIC_URL}/${fileName}` });
     } catch (err) {
         console.error("R2 Upload Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- Keep your other routes (GET /exams, PUT /exams, POST /pins, etc.) exactly as they are ---
 app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
@@ -119,10 +110,24 @@ app.post('/api/pins/verify', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ⚠️ FIXED: This query now joins the exams table to get the real name
 app.get('/api/admin/pins', async (req, res) => {
     try {
-        const result = await db.execute("SELECT * FROM pins ORDER BY date DESC");
-        res.json(result.rows.map(row => ({ pin: row.pin, deviceId: row.deviceId, subjects: JSON.parse(row.subjects), date: row.date, examId: { name: row.examId } })));
+        const result = await db.execute(`
+            SELECT pins.*, exams.name as examName 
+            FROM pins 
+            LEFT JOIN exams ON pins.examId = exams.id 
+            ORDER BY pins.date DESC
+        `);
+        
+        const formatted = result.rows.map(row => ({
+            pin: row.pin, 
+            deviceId: row.deviceId, 
+            subjects: JSON.parse(row.subjects), 
+            date: row.date,
+            examId: { name: row.examName || 'Deleted Exam' } // Use the joined exam name
+        }));
+        res.json(formatted);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
