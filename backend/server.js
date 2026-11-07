@@ -13,7 +13,6 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-// Cloudflare R2 Setup
 const s3 = new S3Client({
   region: 'auto',
   endpoint: process.env.R2_ENDPOINT,
@@ -31,6 +30,10 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
     
+    // NEW TABLES: News and Visitors
+    await db.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, date TEXT);`);
+    await db.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
+    
     const exams = await db.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
         const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
@@ -44,6 +47,7 @@ async function initDB() {
 }
 initDB();
 
+// --- R2 UPLOAD ---
 app.post('/api/upload', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -57,20 +61,14 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         });
         await s3.send(command);
         res.json({ imageUrl: `${process.env.R2_PUBLIC_URL}/${fileName}` });
-    } catch (err) {
-        console.error("R2 Upload Error:", err);
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- EXAMS & PINS (UNCHANGED) ---
 app.get('/api/exams', async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM exams");
-        const formatted = result.rows.map(row => ({
-            _id: row.id, name: row.name, slug: row.slug, logo: row.logo,
-            prices: JSON.parse(row.prices), allow: JSON.parse(row.allow), subjects: JSON.parse(row.subjects)
-        }));
-        res.json(formatted);
+        res.json(result.rows.map(row => ({ _id: row.id, name: row.name, slug: row.slug, logo: row.logo, prices: JSON.parse(row.prices), allow: JSON.parse(row.allow), subjects: JSON.parse(row.subjects) })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -81,7 +79,6 @@ app.put('/api/exams/:id', async (req, res) => {
         if (prices) { updateParts.push("prices = ?"); args.push(JSON.stringify(prices)); }
         if (allow) { updateParts.push("allow = ?"); args.push(JSON.stringify(allow)); }
         if (subjects) { updateParts.push("subjects = ?"); args.push(JSON.stringify(subjects)); }
-        if (updateParts.length === 0) return res.status(400).json({ error: "No data" });
         args.push(req.params.id);
         await db.execute({ sql: `UPDATE exams SET ${updateParts.join(', ')} WHERE id = ?`, args: args });
         res.json({ success: true });
@@ -110,27 +107,14 @@ app.post('/api/pins/verify', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ⚠️ FIXED: This query now joins the exams table to get the real name
 app.get('/api/admin/pins', async (req, res) => {
     try {
-        const result = await db.execute(`
-            SELECT pins.*, exams.name as examName 
-            FROM pins 
-            LEFT JOIN exams ON pins.examId = exams.id 
-            ORDER BY pins.date DESC
-        `);
-        
-        const formatted = result.rows.map(row => ({
-            pin: row.pin, 
-            deviceId: row.deviceId, 
-            subjects: JSON.parse(row.subjects), 
-            date: row.date,
-            examId: { name: row.examName || 'Deleted Exam' } // Use the joined exam name
-        }));
-        res.json(formatted);
+        const result = await db.execute(`SELECT pins.*, exams.name as examName FROM pins LEFT JOIN exams ON pins.examId = exams.id ORDER BY pins.date DESC`);
+        res.json(result.rows.map(row => ({ pin: row.pin, deviceId: row.deviceId, subjects: JSON.parse(row.subjects), date: row.date, examId: { name: row.examName || 'Deleted Exam' } })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- ENQUIRIES (UNCHANGED) ---
 app.post('/api/enquiries', async (req, res) => {
     try {
         const { name, email, phone, exam, message } = req.body;
@@ -141,6 +125,53 @@ app.post('/api/enquiries', async (req, res) => {
 
 app.get('/api/enquiries', async (req, res) => {
     try { const result = await db.execute("SELECT * FROM enquiries ORDER BY date DESC"); res.json(result.rows); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- NEW: VISITOR TRACKING & STATS ---
+app.post('/api/visitors', async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        await db.execute({ sql: "INSERT INTO visitors (date) VALUES (?)", args: [today] });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/stats', async (req, res) => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const todayRes = await db.execute({ sql: "SELECT COUNT(*) as count FROM visitors WHERE date = ?", args: [today] });
+        const totalRes = await db.execute("SELECT COUNT(*) as count FROM visitors");
+        const pinsRes = await db.execute("SELECT COUNT(*) as count FROM pins");
+        
+        res.json({
+            todayVisitors: todayRes.rows[0].count,
+            totalVisitors: totalRes.rows[0].count,
+            totalPinsSold: pinsRes.rows[0].count
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- NEW: NEWS & UPDATES ---
+app.post('/api/admin/news', async (req, res) => {
+    try {
+        const { title, content } = req.body;
+        await db.execute({ sql: "INSERT INTO news (title, content, date) VALUES (?, ?, ?)", args: [title, content, new Date().toISOString()] });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/news', async (req, res) => {
+    try {
+        const result = await db.execute("SELECT * FROM news ORDER BY date DESC");
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/admin/news/:id', async (req, res) => {
+    try {
+        await db.execute({ sql: "DELETE FROM news WHERE id = ?", args: [req.params.id] });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = process.env.PORT || 5000;
