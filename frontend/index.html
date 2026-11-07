@@ -21,7 +21,7 @@
         <nav>
             <ul>
                 <li><a href="#" onclick="showPage('home')">Home</a></li>
-                <li><a href="#" onclick="showPage('updates')">Updates</a></li> <!-- NEW LINK -->
+                <li><a href="#" onclick="showPage('updates')">Updates</a></li>
                 <li><a href="#" onclick="showPage('history')">My PINs</a></li>
                 <li><a href="#" onclick="showPage('verify')">View Content</a></li>
             </ul>
@@ -39,13 +39,17 @@
             <div class="exam-grid" id="home-exam-grid"></div>
         </section>
 
+        <!-- CONTACT SECTION -->
         <section id="contact" class="contact-section">
             <h2 class="section-title text-yellow">Contact Us Today</h2>
             <div class="contact-info">
                 <div class="phone-number"><i class="fas fa-phone-alt"></i> +234 704 813 5078</div>
                 <div class="social-links">
-                    <a href="https://wa.me/2347048135078" class="social-btn wa-btn" target="_blank"><i class="fab fa-whatsapp"></i> WhatsApp</a>
-                    <a href="https://t.me/Officialkingjay1" class="social-btn tg-btn" target="_blank"><i class="fab fa-telegram"></i> Telegram</a>
+                    <!-- Updated Channel Links -->
+                    <a href="https://whatsapp.com/channel/0029VbDKKpk6LwHkzWvLyk3e" class="social-btn wa-btn" target="_blank"><i class="fab fa-whatsapp"></i> WhatsApp Channel</a>
+                    <a href="https://t.me/allexamexporunz" class="social-btn tg-btn" target="_blank"><i class="fab fa-telegram"></i> Telegram Channel</a>
+                    <!-- Facebook Placeholder -->
+                    <a href="#" class="social-btn fb-btn" target="_blank"><i class="fab fa-facebook"></i> Facebook</a>
                 </div>
             </div>
             <form class="contact-form" id="enquiryForm">
@@ -66,12 +70,13 @@
         </section>
     </main>
 
-    <!-- NEW: UPDATES PAGE -->
+    <!-- UPDATES PAGE -->
     <main id="page-updates" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <h2 class="section-title">Latest News & Updates</h2>
         <div id="news-container"></div>
     </main>
 
+    <!-- PACKAGES PAGE -->
     <main id="page-packages" style="display: none; padding: 40px 5%;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
@@ -97,12 +102,14 @@
         </div>
     </main>
 
+    <!-- MY PINS PAGE -->
     <main id="page-history" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <h2 class="section-title">My Purchased PINs</h2>
         <p style="text-align:center; margin-bottom:20px; color:#666;">These are the PINs you have purchased on this specific device.</p>
         <div id="pin-history-container"></div>
     </main>
 
+    <!-- VERIFY CONTENT PAGE -->
     <main id="page-verify" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <div style="background: #eef2f5; border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
             <p style="font-size: 14px; color: #666; margin-bottom: 5px;">Your Unique Device ID:</p>
@@ -122,7 +129,7 @@
         </div>
     </main>
 
-    <!-- Modals remain the same -->
+    <!-- CHECKOUT MODAL -->
     <div id="checkout-modal" class="modal">
         <div class="modal-content">
             <h3>Checkout: <span id="checkout-title"></span></h3>
@@ -136,12 +143,13 @@
             <button class="btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button>
             <div style="text-align:center; margin-top:15px;">
                 <p style="font-size:14px; color:#666; margin-bottom:5px;">Having payment issues?</p>
-                <a href="https://t.me/Officialkingjay1" target="_blank" style="background:#0088cc; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block;"><i class="fab fa-telegram"></i> Contact Support</a>
+                <a href="https://t.me/allexamexporunz" target="_blank" style="background:#0088cc; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block;"><i class="fab fa-telegram"></i> Contact Support</a>
             </div>
             <button class="btn-cancel" onclick="closeModal('checkout-modal')" style="margin-top: 15px;">Cancel</button>
         </div>
     </div>
 
+    <!-- SUCCESS MODAL -->
     <div id="success-modal" class="modal">
         <div class="modal-content" style="text-align: center;">
             <h3 style="color: green;">Payment Successful!</h3>
@@ -151,6 +159,17 @@
         </div>
     </div>
 
-    <script src="script.js?v=5"></script>
+    <!-- RESTORED FOOTER -->
+    <footer style="text-align: center; padding: 30px 20px; background: #001f5b; color: #aaa; font-size: 14px; margin-top: 40px;">
+        <img src="logo.png" alt="Success Academy" style="width: 60px; margin-bottom: 15px;" onerror="this.style.display='none'">
+        <p style="color: white; font-weight: bold; margin-bottom: 5px;">Success Academy</p>
+        <p>&copy; 2026 Success Academy. All Rights Reserved.</p>
+        <p style="margin-top: 5px;">Serving Students Across Nigeria and West Africa</p>
+        <div style="margin-top: 15px;">
+            <a href="admin.html" style="color: #ffcc00; text-decoration: none; font-size: 12px;"><i class="fas fa-lock"></i> Admin Login</a>
+        </div>
+    </footer>
+
+    <script src="script.js?v=7"></script>
 </body>
-</html>
+    </html>
