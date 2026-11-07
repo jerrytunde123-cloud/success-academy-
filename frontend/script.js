@@ -5,7 +5,10 @@ var dbExams = [];
 var currentExam = null;
 var currentPackageType = null;
 var currentPrice = 0;
-const PLACEHOLDER = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
+
+// ⚠️ NEW PLACEHOLDERS
+const PLACEHOLDER_SELECT = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
+const PLACEHOLDER_NO_IMAGE = 'https://placehold.co/300x150/001f5b/ffffff?text=No+Photo+Yet';
 
 // Log visitor on page load
 fetch(API_URL + '/visitors', { method: 'POST' }).catch(() => {});
@@ -216,7 +219,10 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.per_subject;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'block';
-        previewImg.src = PLACEHOLDER;
+        
+        // ⚠️ SET DEFAULT IMAGE
+        previewImg.src = PLACEHOLDER_SELECT;
+        
         var html = '';
         currentExam.subjects.forEach(function(sub) {
             html += '<label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="' + sub.name + '" onchange="updatePreviewAndLimit(this, 1)"> ' + sub.name + '</label>';
@@ -241,22 +247,29 @@ function openCheckout(packageType) {
     document.getElementById('checkout-modal').style.display = 'flex';
 }
 
-// ⚠️ FIXED: Enforces single selection for "Per Subject"
+// ⚠️ UPDATED: Exclusive selection for per_subject & dynamic placeholder logic
 function updatePreviewAndLimit(checkbox, max) {
-    // If the user checked a box, uncheck all other boxes first
-    if (checkbox.checked) {
-        var allCheckboxes = document.querySelectorAll('input[name="subject"]');
-        allCheckboxes.forEach(function(cb) {
-            if (cb !== checkbox) cb.checked = false;
+    var checked = document.querySelectorAll('input[name="subject"]:checked');
+    
+    // If max is 1 (Per Subject), uncheck all others so only one remains selected
+    if (max === 1) {
+        checked.forEach(function(cb) {
+            if(cb !== checkbox) cb.checked = false;
         });
+    } else if (checked.length > max) {
+        // For other packages, just block the selection if they exceed max
+        checkbox.checked = false; 
+        alert('Max ' + max + ' subjects allowed.');
+        return;
     }
     
     if (checkbox.checked) {
         var subData = currentExam.subjects.find(function(s) { return s.name === checkbox.value; });
-        document.getElementById('subject-preview-img').src = subData.thumbnail || PLACEHOLDER;
+        // Show image if it exists, else show "No Photo Yet"
+        document.getElementById('subject-preview-img').src = subData.thumbnail || PLACEHOLDER_NO_IMAGE;
     } else {
-        // If they uncheck the box, revert to the placeholder
-        document.getElementById('subject-preview-img').src = PLACEHOLDER;
+        // If nothing is selected, revert to "Select a Subject"
+        document.getElementById('subject-preview-img').src = PLACEHOLDER_SELECT;
     }
 }
 
@@ -275,7 +288,7 @@ function payWithPaystack() {
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
     var handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', 
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
