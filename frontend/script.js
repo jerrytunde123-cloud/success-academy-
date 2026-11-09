@@ -172,7 +172,6 @@ window.collapseNews = function(id) {
     document.getElementById('short-' + id).style.display = 'block';
 }
 
-// ⚠️ BULLETPROOF FUNCTION: Checks if elements exist before updating them
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
     if (!currentExam) return;
@@ -239,9 +238,19 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.per_dept;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'none';
-        if (instructionText) instructionText.style.display = 'block'; 
         
-        var maxSubs = (currentExam.name.includes('JAMB') || currentExam.name.includes('JUPEB') || currentExam.name.includes('IJMB')) ? 4 : 9;
+        // ⚠️ DYNAMIC TEXT LOGIC
+        if (instructionText) {
+            instructionText.style.display = 'block';
+            var examNameUpper = currentExam.name.toUpperCase();
+            if (examNameUpper.includes('JAMB') || examNameUpper.includes('JUPEB') || examNameUpper.includes('IJMB') || examNameUpper.includes('POST UTME')) {
+                instructionText.innerText = "Please select the 4 subjects for your department.";
+            } else {
+                instructionText.innerText = "Please select the 9 subjects for your department.";
+            }
+        }
+        
+        var maxSubs = (currentExam.name.includes('JAMB') || currentExam.name.includes('JUPEB') || currentExam.name.includes('IJMB') || currentExam.name.includes('POST UTME')) ? 4 : 9;
         var html = '';
         currentExam.subjects.forEach(function(sub) {
             html += '<label style="display:block; padding:5px;"><input type="checkbox" name="subject" value="' + sub.name + '" onchange="limitSubjects(this, ' + maxSubs + ')"> ' + sub.name + '</label>';
