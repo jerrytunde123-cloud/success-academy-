@@ -111,6 +111,7 @@ function renderExams() {
 
 function fetchNews() {
     var container = document.getElementById('news-container');
+    if(!container) return;
     container.innerHTML = 'Loading updates...';
     
     var hash = window.location.hash;
@@ -171,29 +172,45 @@ window.collapseNews = function(id) {
     document.getElementById('short-' + id).style.display = 'block';
 }
 
+// ⚠️ BULLETPROOF FUNCTION: Checks if elements exist before updating them
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
     if (!currentExam) return;
     
-    document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
+    var titleEl = document.getElementById('pkg-exam-title');
+    if (titleEl) titleEl.innerText = currentExam.name + ' Packages';
     
-    // ⚠️ NEW: Update the note text dynamically based on the exam name
-    document.getElementById('exam-note').innerText = `All ${currentExam.name} questions and answers drop a day before the exam. Subscribe now to secure your PIN!`;
+    var noteEl = document.getElementById('exam-note');
+    if (noteEl) noteEl.innerText = 'All ' + currentExam.name + ' questions and answers drop a day before the exam. Subscribe now to secure your PIN!';
 
     var shareBtn = document.getElementById('share-link-btn');
-    shareBtn.onclick = function() { 
-        var url = window.location.origin + window.location.pathname + '?exam=' + currentExam.slug;
-        navigator.clipboard.writeText(url);
-        alert('Shareable link copied: ' + url);
-    };
+    if (shareBtn) {
+        shareBtn.onclick = function() { 
+            var url = window.location.origin + window.location.pathname + '?exam=' + currentExam.slug;
+            navigator.clipboard.writeText(url);
+            alert('Shareable link copied: ' + url);
+        };
+    }
     
-    document.getElementById('price-per-subject').innerText = currentExam.prices.per_subject;
-    document.getElementById('price-per-dept').innerText = currentExam.prices.per_dept;
-    document.getElementById('price-all-subjects').innerText = currentExam.prices.all_subjects;
+    var prices = currentExam.prices || {};
+    var pSubject = document.getElementById('price-per-subject');
+    if (pSubject) pSubject.innerText = prices.per_subject || 0;
+    
+    var pDept = document.getElementById('price-per-dept');
+    if (pDept) pDept.innerText = prices.per_dept || 0;
+    
+    var pAll = document.getElementById('price-all-subjects');
+    if (pAll) pAll.innerText = prices.all_subjects || 0;
 
-    document.getElementById('pkg-per-subject').style.display = currentExam.allow.per_subject ? 'block' : 'none';
-    document.getElementById('pkg-per-dept').style.display = currentExam.allow.per_dept ? 'block' : 'none';
-    document.getElementById('pkg-all-subjects').style.display = currentExam.allow.all_subjects ? 'block' : 'none';
+    var allow = currentExam.allow || {};
+    var pkgSubject = document.getElementById('pkg-per-subject');
+    if (pkgSubject) pkgSubject.style.display = allow.per_subject ? 'block' : 'none';
+    
+    var pkgDept = document.getElementById('pkg-per-dept');
+    if (pkgDept) pkgDept.style.display = allow.per_dept ? 'block' : 'none';
+    
+    var pkgAll = document.getElementById('pkg-all-subjects');
+    if (pkgAll) pkgAll.style.display = allow.all_subjects ? 'block' : 'none';
 
     showPage('packages');
 }
@@ -211,7 +228,7 @@ function openCheckout(packageType) {
         subjectArea.style.display = 'block';
         previewArea.style.display = 'block';
         previewImg.src = PLACEHOLDER_SELECT;
-        instructionText.style.display = 'none'; 
+        if (instructionText) instructionText.style.display = 'none'; 
         
         var html = '';
         currentExam.subjects.forEach(function(sub) {
@@ -222,7 +239,7 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.per_dept;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'none';
-        instructionText.style.display = 'block'; 
+        if (instructionText) instructionText.style.display = 'block'; 
         
         var maxSubs = (currentExam.name.includes('JAMB') || currentExam.name.includes('JUPEB') || currentExam.name.includes('IJMB')) ? 4 : 9;
         var html = '';
@@ -234,7 +251,7 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.all_subjects;
         subjectArea.style.display = 'none';
         previewArea.style.display = 'none';
-        instructionText.style.display = 'none';
+        if (instructionText) instructionText.style.display = 'none';
     }
     document.getElementById('checkout-amount').innerText = '₦' + currentPrice;
     document.getElementById('checkout-modal').style.display = 'flex';
