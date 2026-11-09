@@ -84,7 +84,6 @@ function showPage(pageId) {
     if(pageId === 'history') loadMyPinHistory(); 
 }
 
-// ⚠️ FIXED: Now returns the fetch promise so we can call checkSharedLink after
 function fetchExams() {
     return fetch(API_URL + '/exams', { cache: "no-store" })
     .then(function(response) { return response.json(); })
@@ -175,8 +174,12 @@ window.collapseNews = function(id) {
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return e._id === examId; });
     if (!currentExam) return;
+    
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
     
+    // ⚠️ NEW: Update the note text dynamically based on the exam name
+    document.getElementById('exam-note').innerText = `All ${currentExam.name} questions and answers drop a day before the exam. Subscribe now to secure your PIN!`;
+
     var shareBtn = document.getElementById('share-link-btn');
     shareBtn.onclick = function() { 
         var url = window.location.origin + window.location.pathname + '?exam=' + currentExam.slug;
@@ -208,7 +211,7 @@ function openCheckout(packageType) {
         subjectArea.style.display = 'block';
         previewArea.style.display = 'block';
         previewImg.src = PLACEHOLDER_SELECT;
-        instructionText.style.display = 'none'; // Hide note
+        instructionText.style.display = 'none'; 
         
         var html = '';
         currentExam.subjects.forEach(function(sub) {
@@ -219,7 +222,7 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.per_dept;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'none';
-        instructionText.style.display = 'block'; // ⚠️ SHOW NOTE
+        instructionText.style.display = 'block'; 
         
         var maxSubs = (currentExam.name.includes('JAMB') || currentExam.name.includes('JUPEB') || currentExam.name.includes('IJMB')) ? 4 : 9;
         var html = '';
@@ -395,7 +398,6 @@ if(enquiryForm) {
     });
 }
 
-// ⚠️ FIXED: Ensure shared links open the specific exam
 function checkSharedLink() {
     const urlParams = new URLSearchParams(window.location.search);
     const examSlug = urlParams.get('exam');
@@ -412,4 +414,3 @@ window.onload = function() {
         });
     }
 };
- 
