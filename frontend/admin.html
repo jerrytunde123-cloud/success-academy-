@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>Admin Dashboard | Success Academy</title>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-    <!-- Added Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
@@ -66,7 +65,6 @@
             <button class="tab" onclick="switchTab('enquiries', event)">Enquiries</button>
         </div>
 
-        <!-- EXAMS TAB -->
         <div id="tab-exams" class="section active">
             <select id="exam-select" onchange="loadExamConfig()">
                 <option value="">-- Select Exam --</option>
@@ -107,7 +105,6 @@
             </div>
         </div>
 
-        <!-- PINS TAB -->
         <div id="tab-pins" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3>Generate Manual PIN</h3>
@@ -124,7 +121,6 @@
             </table>
         </div>
 
-        <!-- NEWS TAB -->
         <div id="tab-news" class="section">
             <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <h3 id="news-form-title">Publish New Update</h3>
@@ -144,7 +140,6 @@
             <div id="news-list"></div>
         </div>
 
-        <!-- ENQUIRIES TAB -->
         <div id="tab-enquiries" class="section">
             <h3>Customer Enquiries</h3>
             <table>
@@ -154,7 +149,6 @@
         </div>
     </div>
 
-    <!-- REPLY MODAL -->
     <div id="reply-modal" class="modal">
         <div class="modal-content">
             <h3>Reply to <span id="reply-name"></span></h3>
@@ -505,15 +499,19 @@
                 } catch (e) { alert('Error generating PIN.'); }
             }
 
-            // ⚠️ UPDATED: Enquiries now have BOTH Email and WhatsApp buttons
+            // ⚠️ UPDATED: Custom WhatsApp Message Pre-filled
             async function loadEnquiries() {
                 const res = await fetch(`${API_URL}/enquiries`, { cache: "no-store" });
                 const enquiries = await res.json();
                 const tbody = document.getElementById('enquiry-table-body');
                 tbody.innerHTML = '';
+                
                 enquiries.forEach(enq => {
-                    // Clean phone number for WhatsApp (removes spaces, +, etc.)
                     const cleanPhone = enq.phone.replace(/[^0-9]/g, '');
+                    
+                    // Create a custom pre-filled message
+                    const waMessage = `Hello ${enq.name}, this is Success Academy. I received your enquiry regarding ${enq.exam}. How can I help you today?`;
+                    const waLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMessage)}`;
                     
                     tbody.innerHTML += `
                         <tr>
@@ -525,7 +523,7 @@
                             <td>${enq.message}</td>
                             <td style="display: flex; gap: 5px; flex-wrap: wrap;">
                                 <button onclick="openReply('${enq.name}','${enq.email}')" style="background: #0088cc; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;"><i class="fas fa-envelope"></i> Email</button>
-                                <a href="https://wa.me/${cleanPhone}" target="_blank" style="background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px; text-decoration: none; display: inline-block;"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+                                <a href="${waLink}" target="_blank" style="background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px; text-decoration: none; display: inline-block;"><i class="fab fa-whatsapp"></i> WhatsApp</a>
                             </td>
                         </tr>
                     `;
