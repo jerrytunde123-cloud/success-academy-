@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Admin Dashboard | Success Academy</title>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <!-- Added Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: none; }
@@ -168,6 +170,7 @@
             const ADMIN_PASSWORD = "admin123"; 
             const API_URL = 'https://success-academy-backend-mh1o.onrender.com/api'; 
             
+            // ⚠️ EMAILJS CONFIGURATION (Replace with your actual keys)
             emailjs.init("oFtTHwtJcNPqUoEL0"); 
             const EMAILJS_SERVICE_ID = "service_6pynucv"; 
             const EMAILJS_TEMPLATE_ID = "template_w2ee2uu";
@@ -176,7 +179,7 @@
             let activeExam = null;
             let activeSubject = null;
             let currentReplyData = null;
-            let allNews = []; // Store news locally to fix the edit bug
+            let allNews = [];
 
             window.checkPassword = function() {
                 if(document.getElementById('admin-password').value === ADMIN_PASSWORD) {
@@ -343,7 +346,6 @@
                 } catch (error) { alert("Failed to save: " + error.message); }
             }
 
-            // --- NEWS FUNCTIONS ---
             window.saveNews = async function() {
                 const id = document.getElementById('edit-news-id').value;
                 const title = document.getElementById('news-title').value;
@@ -388,7 +390,6 @@
                 loadNews();
             }
 
-            // ⚠️ FIXED: Edit now fetches data directly from local memory, preventing quote errors
             window.editNews = function(id) {
                 const item = allNews.find(n => n.id === id);
                 if(!item) return;
@@ -420,7 +421,7 @@
 
             async function loadNews() {
                 const res = await fetch(`${API_URL}/news`, { cache: "no-store" });
-                allNews = await res.json(); // Store in local memory
+                allNews = await res.json();
                 const list = document.getElementById('news-list');
                 list.innerHTML = '';
                 if(allNews.length === 0) { list.innerHTML = '<p>No news yet.</p>'; return; }
@@ -461,7 +462,6 @@
                 loadNews();
             }
 
-            // --- PIN & ENQUIRY FUNCTIONS ---
             async function loadPinHistory() {
                 const res = await fetch(`${API_URL}/admin/pins`, { cache: "no-store" });
                 const pins = await res.json();
@@ -505,13 +505,30 @@
                 } catch (e) { alert('Error generating PIN.'); }
             }
 
+            // ⚠️ UPDATED: Enquiries now have BOTH Email and WhatsApp buttons
             async function loadEnquiries() {
                 const res = await fetch(`${API_URL}/enquiries`, { cache: "no-store" });
                 const enquiries = await res.json();
                 const tbody = document.getElementById('enquiry-table-body');
                 tbody.innerHTML = '';
                 enquiries.forEach(enq => {
-                    tbody.innerHTML += `<tr><td>${new Date(enq.date).toLocaleDateString()}</td><td>${enq.name}</td><td>${enq.phone}</td><td>${enq.email}</td><td>${enq.exam}</td><td>${enq.message}</td><td><button class="btn-reply" onclick="openReply('${enq.name}','${enq.email}')">Reply</button></td></tr>`;
+                    // Clean phone number for WhatsApp (removes spaces, +, etc.)
+                    const cleanPhone = enq.phone.replace(/[^0-9]/g, '');
+                    
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${new Date(enq.date).toLocaleDateString()}</td>
+                            <td>${enq.name}</td>
+                            <td>${enq.phone}</td>
+                            <td>${enq.email}</td>
+                            <td>${enq.exam}</td>
+                            <td>${enq.message}</td>
+                            <td style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                <button onclick="openReply('${enq.name}','${enq.email}')" style="background: #0088cc; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;"><i class="fas fa-envelope"></i> Email</button>
+                                <a href="https://wa.me/${cleanPhone}" target="_blank" style="background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px; text-decoration: none; display: inline-block;"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+                            </td>
+                        </tr>
+                    `;
                 });
             }
 
@@ -529,15 +546,25 @@
                 const msg = document.getElementById('reply-message').value;
                 const status = document.getElementById('email-status');
                 if(!msg) return alert('Type a message');
+                
                 status.innerText = 'Sending...';
-                const templateParams = { to_name: currentReplyData.name, to_email: currentReplyData.email, reply_message: msg };
+                status.style.color = 'blue';
+                
+                const templateParams = { 
+                    to_name: currentReplyData.name, 
+                    to_email: currentReplyData.email, 
+                    reply_message: msg 
+                };
+                
                 try {
                     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+                    status.style.color = 'green';
                     status.innerText = 'Email Sent Successfully!';
                     setTimeout(closeModal, 2000);
                 } catch (error) {
+                    console.error("EmailJS Error:", error);
                     status.style.color = 'red';
-                    status.innerText = 'Failed to send email.';
+                    status.innerText = 'Failed to send email. Check console.';
                 }
             }
 
