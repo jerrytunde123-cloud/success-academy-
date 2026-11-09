@@ -30,10 +30,8 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
     
-    // ⚠️ FIX: Drop the old news table to recreate it with an array of images
-    await db.execute(`DROP TABLE IF EXISTS news;`);
-    await db.execute(`CREATE TABLE news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);`);
-    
+    // ⚠️ FIX: No longer dropping the table, so news never disappears on restart
+    await db.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
     
     const exams = await db.execute("SELECT * FROM exams");
@@ -49,17 +47,14 @@ async function initDB() {
 }
 initDB();
 
-// ⚠️ FIX: Upload route now uses upload.array to handle multiple files
 app.post('/api/upload', upload.array('images', 10), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-        
         let uploadedUrls = [];
         for (let i = 0; i < req.files.length; i++) {
             const file = req.files[i];
             const fileExtension = file.originalname.split('.').pop();
             const fileName = `uploads/${Date.now()}-${Math.round(Math.random() * 1E9)}.${fileExtension}`;
-            
             const command = new PutObjectCommand({
                 Bucket: process.env.R2_BUCKET_NAME,
                 Key: fileName,
@@ -69,7 +64,6 @@ app.post('/api/upload', upload.array('images', 10), async (req, res) => {
             await s3.send(command);
             uploadedUrls.push(`${process.env.R2_PUBLIC_URL}/${fileName}`);
         }
-        
         res.json({ imageUrls: uploadedUrls });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -153,7 +147,6 @@ app.get('/api/admin/stats', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- NEWS ROUTES ---
 app.post('/api/admin/news', async (req, res) => {
     try {
         const { title, content, images } = req.body;
@@ -173,11 +166,7 @@ app.put('/api/admin/news/:id', async (req, res) => {
 app.get('/api/news', async (req, res) => {
     try { 
         const result = await db.execute("SELECT * FROM news ORDER BY date DESC"); 
-        // Parse the JSON string back into an array before sending
-        const formatted = result.rows.map(row => ({
-            ...row,
-            images: JSON.parse(row.images || '[]')
-        }));
+        const formatted = result.rows.map(row => ({ ...row, images: JSON.parse(row.images || '[]') }));
         res.json(formatted); 
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
