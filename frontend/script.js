@@ -6,11 +6,9 @@ var currentExam = null;
 var currentPackageType = null;
 var currentPrice = 0;
 
-// ⚠️ NEW PLACEHOLDERS
 const PLACEHOLDER_SELECT = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
 const PLACEHOLDER_NO_IMAGE = 'https://placehold.co/300x150/001f5b/ffffff?text=No+Photo+Yet';
 
-// Log visitor on page load
 fetch(API_URL + '/visitors', { method: 'POST' }).catch(() => {});
 
 function getDeviceId() {
@@ -86,8 +84,9 @@ function showPage(pageId) {
     if(pageId === 'history') loadMyPinHistory(); 
 }
 
+// ⚠️ FIXED: Now returns the fetch promise so we can call checkSharedLink after
 function fetchExams() {
-    fetch(API_URL + '/exams', { cache: "no-store" })
+    return fetch(API_URL + '/exams', { cache: "no-store" })
     .then(function(response) { return response.json(); })
     .then(function(data) {
         dbExams = data;
@@ -132,24 +131,14 @@ function fetchNews() {
         
         data.forEach(function(item) {
             var date = new Date(item.date).toLocaleDateString();
-            
-            var linkedContent = item.content.replace(
-                /(https?:\/\/[^\s]+)/g, 
-                '<a href="$1" target="_blank" style="color:#0088cc; text-decoration:underline; word-break:break-all;">$1</a>'
-            );
-
-            var isLong = true; 
+            var linkedContent = item.content.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:#0088cc; text-decoration:underline; word-break:break-all;">$1</a>');
             var shortContent = linkedContent.substring(0, 80) + '...';
-
             var imagesHtml = '';
             if (item.images && item.images.length > 0) {
                 imagesHtml = '<div style="display:flex; flex-wrap:wrap; gap:10px; margin:15px 0;">';
-                item.images.forEach(img => {
-                    imagesHtml += `<img src="${img}" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid #ddd;">`;
-                });
+                item.images.forEach(img => { imagesHtml += `<img src="${img}" style="max-width:100%; max-height:300px; border-radius:8px; border:1px solid #ddd;">`; });
                 imagesHtml += '</div>';
             }
-
             var isTarget = (targetNewsId === item.id);
             var displayStyle = isTarget ? 'block' : 'none';
             
@@ -157,12 +146,10 @@ function fetchNews() {
                 <div id="news-${item.id}" style="background:white; padding:20px; border-radius:10px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--accent-yellow);">
                     <h3 style="color:var(--primary-blue); margin-bottom:5px;">${item.title}</h3>
                     <p style="font-size:12px; color:#888; margin-bottom:15px;">${date}</p>
-                    
                     <div id="short-${item.id}" style="display: ${isTarget ? 'none' : 'block'};">
                         <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${shortContent}</p>
                         <button onclick="expandNews(${item.id})" style="background:none; border:none; color:var(--primary-blue); font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Read More →</button>
                     </div>
-
                     <div id="full-${item.id}" style="display: ${displayStyle};">
                         ${imagesHtml}
                         <p style="white-space:pre-wrap; color:#333; line-height:1.6;">${linkedContent}</p>
@@ -214,14 +201,14 @@ function openCheckout(packageType) {
     var previewImg = document.getElementById('subject-preview-img');
     var subjectArea = document.getElementById('subject-selection-area');
     var subjectCheckboxes = document.getElementById('subject-checkboxes');
+    var instructionText = document.getElementById('subject-instruction');
 
     if (packageType === 'per_subject') {
         currentPrice = currentExam.prices.per_subject;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'block';
-        
-        // ⚠️ SET DEFAULT IMAGE
         previewImg.src = PLACEHOLDER_SELECT;
+        instructionText.style.display = 'none'; // Hide note
         
         var html = '';
         currentExam.subjects.forEach(function(sub) {
@@ -232,6 +219,8 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.per_dept;
         subjectArea.style.display = 'block';
         previewArea.style.display = 'none';
+        instructionText.style.display = 'block'; // ⚠️ SHOW NOTE
+        
         var maxSubs = (currentExam.name.includes('JAMB') || currentExam.name.includes('JUPEB') || currentExam.name.includes('IJMB')) ? 4 : 9;
         var html = '';
         currentExam.subjects.forEach(function(sub) {
@@ -242,22 +231,20 @@ function openCheckout(packageType) {
         currentPrice = currentExam.prices.all_subjects;
         subjectArea.style.display = 'none';
         previewArea.style.display = 'none';
+        instructionText.style.display = 'none';
     }
     document.getElementById('checkout-amount').innerText = '₦' + currentPrice;
     document.getElementById('checkout-modal').style.display = 'flex';
 }
 
-// ⚠️ UPDATED: Exclusive selection for per_subject & dynamic placeholder logic
 function updatePreviewAndLimit(checkbox, max) {
     var checked = document.querySelectorAll('input[name="subject"]:checked');
     
-    // If max is 1 (Per Subject), uncheck all others so only one remains selected
     if (max === 1) {
         checked.forEach(function(cb) {
             if(cb !== checkbox) cb.checked = false;
         });
     } else if (checked.length > max) {
-        // For other packages, just block the selection if they exceed max
         checkbox.checked = false; 
         alert('Max ' + max + ' subjects allowed.');
         return;
@@ -265,10 +252,8 @@ function updatePreviewAndLimit(checkbox, max) {
     
     if (checkbox.checked) {
         var subData = currentExam.subjects.find(function(s) { return s.name === checkbox.value; });
-        // Show image if it exists, else show "No Photo Yet"
         document.getElementById('subject-preview-img').src = subData.thumbnail || PLACEHOLDER_NO_IMAGE;
     } else {
-        // If nothing is selected, revert to "Select a Subject"
         document.getElementById('subject-preview-img').src = PLACEHOLDER_SELECT;
     }
 }
@@ -288,7 +273,7 @@ function payWithPaystack() {
         if (selectedSubjects.length === 0) return alert('Select at least one subject.');
     }
     var handler = PaystackPop.setup({
-        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', // ⚠️ REPLACE WITH LIVE KEY
+        key: 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043', 
         email: "student@example.com", 
         amount: currentPrice * 100, 
         callback: function(response) { generatePIN(selectedSubjects); }
@@ -410,6 +395,20 @@ if(enquiryForm) {
     });
 }
 
+// ⚠️ FIXED: Ensure shared links open the specific exam
+function checkSharedLink() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const examSlug = urlParams.get('exam');
+    if (examSlug) {
+        const exam = dbExams.find(e => e.slug === examSlug);
+        if(exam) openExamPackages(exam._id);
+    }
+}
+
 window.onload = function() { 
-    if(document.getElementById('home-exam-grid')) fetchExams(); 
+    if(document.getElementById('home-exam-grid')) {
+        fetchExams().then(() => {
+            checkSharedLink();
+        });
+    }
 };
