@@ -71,12 +71,20 @@
         <div id="news-container"></div>
     </main>
 
+    <!-- PACKAGES PAGE -->
     <main id="page-packages" style="display: none; padding: 40px 5%;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
             <button id="share-link-btn" class="btn-buy" style="width:auto; padding:10px 15px; background:#0088cc;"><i class="fas fa-link"></i> Copy Share Link</button>
         </div>
+        
         <h2 class="section-title" id="pkg-exam-title"></h2>
+        
+        <!-- ⚠️ NEW: Dynamic Note Added Here -->
+        <p id="exam-note" style="text-align: center; color: #d9534f; font-weight: bold; font-size: 15px; margin-top: -15px; margin-bottom: 30px; padding: 0 20px;">
+            All questions and answers drop a day before the exam. Subscribe now to secure your PIN!
+        </p>
+
         <div class="packages-container">
             <div class="package-card" id="pkg-per-subject">
                 <h3>Per Subject</h3>
@@ -121,7 +129,6 @@
         </div>
     </main>
 
-    <!-- CHECKOUT MODAL -->
     <div id="checkout-modal" class="modal">
         <div class="modal-content">
             <h3>Checkout: <span id="checkout-title"></span></h3>
@@ -130,9 +137,7 @@
                 <img id="subject-preview-img" src="" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
             </div>
             <div id="subject-selection-area" style="display: none; margin: 15px 0;">
-                <!-- ⚠️ NEW: Per Department Instruction Note -->
                 <p id="subject-instruction" style="font-size: 13px; color: #d9534f; font-weight: bold; margin-bottom: 10px; display: none;">Please select the 9 subjects for your department.</p>
-                
                 <div id="subject-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;"></div>
             </div>
             <button class="btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button>
@@ -144,7 +149,6 @@
         </div>
     </div>
 
-    <!-- SUCCESS MODAL -->
     <div id="success-modal" class="modal">
         <div class="modal-content" style="text-align: center;">
             <h3 style="color: green;">Payment Successful!</h3>
@@ -161,7 +165,6 @@
         <p style="margin-top: 5px;">Serving Students Across Nigeria and West Africa</p>
     </footer>
 
-    <script src="script.js?v=9"></script>
+    <script src="script.js?v=10"></script>
 </body>
 </html>
- 
