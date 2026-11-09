@@ -39,13 +39,11 @@
             <div class="exam-grid" id="home-exam-grid"></div>
         </section>
 
-        <!-- CONTACT SECTION -->
         <section id="contact" class="contact-section">
             <h2 class="section-title text-yellow">Contact Us Today</h2>
             <div class="contact-info">
                 <div class="phone-number"><i class="fas fa-phone-alt"></i> +234 704 813 5078</div>
                 <div class="social-links">
-                    <!-- Only WhatsApp and Telegram Channels -->
                     <a href="https://whatsapp.com/channel/0029VbDKKpk6LwHkzWvLyk3e" class="social-btn wa-btn" target="_blank"><i class="fab fa-whatsapp"></i> WhatsApp Channel</a>
                     <a href="https://t.me/allexamexporunz" class="social-btn tg-btn" target="_blank"><i class="fab fa-telegram"></i> Telegram Channel</a>
                 </div>
@@ -68,13 +66,11 @@
         </section>
     </main>
 
-    <!-- UPDATES PAGE -->
     <main id="page-updates" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <h2 class="section-title">Latest News & Updates</h2>
         <div id="news-container"></div>
     </main>
 
-    <!-- PACKAGES PAGE -->
     <main id="page-packages" style="display: none; padding: 40px 5%;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
@@ -100,14 +96,12 @@
         </div>
     </main>
 
-    <!-- MY PINS PAGE -->
     <main id="page-history" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <h2 class="section-title">My Purchased PINs</h2>
         <p style="text-align:center; margin-bottom:20px; color:#666;">These are the PINs you have purchased on this specific device.</p>
         <div id="pin-history-container"></div>
     </main>
 
-    <!-- VERIFY CONTENT PAGE -->
     <main id="page-verify" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
         <div style="background: #eef2f5; border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
             <p style="font-size: 14px; color: #666; margin-bottom: 5px;">Your Unique Device ID:</p>
@@ -136,6 +130,9 @@
                 <img id="subject-preview-img" src="" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
             </div>
             <div id="subject-selection-area" style="display: none; margin: 15px 0;">
+                <!-- ⚠️ NEW: Per Department Instruction Note -->
+                <p id="subject-instruction" style="font-size: 13px; color: #d9534f; font-weight: bold; margin-bottom: 10px; display: none;">Please select the 9 subjects for your department.</p>
+                
                 <div id="subject-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;"></div>
             </div>
             <button class="btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button>
@@ -157,7 +154,6 @@
         </div>
     </div>
 
-    <!-- FOOTER (Admin Link Removed) -->
     <footer style="text-align: center; padding: 30px 20px; background: #001f5b; color: #aaa; font-size: 14px; margin-top: 40px;">
         <img src="logo.png" alt="Success Academy" style="width: 60px; margin-bottom: 15px;" onerror="this.style.display='none'">
         <p style="color: white; font-weight: bold; margin-bottom: 5px;">Success Academy</p>
@@ -165,6 +161,6 @@
         <p style="margin-top: 5px;">Serving Students Across Nigeria and West Africa</p>
     </footer>
 
-    <script src="script.js?v=8"></script>
+    <script src="script.js?v=9"></script>
 </body>
-    </html>
+</html>
