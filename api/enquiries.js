@@ -1,35 +1,22 @@
-const { createClient } = require('@libsql/client');
+const { getClient, resetClient, withRetry, withTimeout, json } = require('./_db.js');
 
-function json(res, status, data) {
-    res.setHeader('Content-Type', 'application/json');
-    res.status(status).json(data);
-}
-
-function withTimeout(promise, ms, label) {
-    return Promise.race([
-        promise,
-        new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-        )
-    ]);
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(new Error('Invalid JSON body')); }
+        });
+        req.on('error', reject);
+    });
 }
 
 module.exports = async (req, res) => {
+    const TIMEOUT_MS = 30000;
     if (req.method !== 'POST') {
         json(res, 405, { error: 'Method not allowed' });
         return;
     }
-
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-        json(res, 500, { error: 'Database not configured. Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel.' });
-        return;
-    }
-
-    const client = createClient({
-        url: process.env.TURSO_DATABASE_URL,
-        authToken: process.env.TURSO_AUTH_TOKEN,
-    });
-    const TIMEOUT_MS = 30000;
 
     let body = '';
     for await (const chunk of req) {body += chunk;}
@@ -47,12 +34,19 @@ module.exports = async (req, res) => {
     }
 
     try {
-        await withTimeout(client.execute({
-            sql: 'INSERT INTO enquiries (name, email, phone, exam, message, date) VALUES (?, ?, ?, ?, ?, ?)',
-            args: [name, email, phone || '', exam || '', message, new Date().toISOString()]
-        }), TIMEOUT_MS, 'INSERT enquiry');
+        await withRetry(() =>
+            withTimeout(getClient().execute({
+                sql: 'INSERT INTO enquiries (name, email, phone, exam, message, date) VALUES (?, ?, ?, ?, ?, ?)',
+                args: [name, email, phone || '', exam || '', message, new Date().toISOString()]
+            }), TIMEOUT_MS, 'INSERT enquiry')
+        );
         json(res, 200, { success: true });
     } catch (err) {
-        json(res, 500, { error: err.message });
+        if (err.message && err.message.includes('EAI_AGAIN')) {
+            resetClient();
+            json(res, 503, { error: 'Database DNS resolution failed. Check TURSO_DATABASE_URL is correct and your Turso database is active.' });
+        } else {
+            json(res, 500, { error: err.message });
+        }
     }
 };

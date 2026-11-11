@@ -1,35 +1,25 @@
-const { createClient } = require('@libsql/client');
+const { getClient, resetClient, withRetry, withTimeout, json } = require('./_db.js');
 
-function json(res, status, data) {
-    res.setHeader('Content-Type', 'application/json');
-    res.status(status).json(data);
-}
-
-function withTimeout(promise, ms, label) {
-    return Promise.race([
-        promise,
-        new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-        )
-    ]);
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(new Error('Invalid JSON body')); }
+        });
+        req.on('error', reject);
+    });
 }
 
 module.exports = async (req, res) => {
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-        json(res, 500, { error: 'Database not configured. Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in Vercel.' });
-        return;
-    }
-
-    const client = createClient({
-        url: process.env.TURSO_DATABASE_URL,
-        authToken: process.env.TURSO_AUTH_TOKEN,
-    });
     const TIMEOUT_MS = 30000;
     const id = req.query.id || '';
 
     if (req.method === 'GET' && !id) {
         try {
-            const result = await withTimeout(client.execute('SELECT * FROM news ORDER BY date DESC'), TIMEOUT_MS, 'GET news');
+            const result = await withRetry(() =>
+                withTimeout(getClient().execute('SELECT * FROM news ORDER BY date DESC'), TIMEOUT_MS, 'GET news')
+            );
             const formatted = result.rows.map(row => ({
                 id: row.id,
                 title: row.title,
@@ -39,7 +29,12 @@ module.exports = async (req, res) => {
             }));
             json(res, 200, formatted);
         } catch (err) {
-            json(res, 500, { error: err.message });
+            if (err.message && err.message.includes('EAI_AGAIN')) {
+                resetClient();
+                json(res, 503, { error: 'Database DNS resolution failed. Check TURSO_DATABASE_URL is correct and your Turso database is active.' });
+            } else {
+                json(res, 500, { error: err.message });
+            }
         }
         return;
     }
@@ -58,13 +53,20 @@ module.exports = async (req, res) => {
             return;
         }
         try {
-            await withTimeout(client.execute({
-                sql: 'INSERT INTO news (title, content, images, date) VALUES (?, ?, ?, ?)',
-                args: [title, content, JSON.stringify(images || []), new Date().toISOString()]
-            }), TIMEOUT_MS, 'INSERT news');
+            await withRetry(() =>
+                withTimeout(getClient().execute({
+                    sql: 'INSERT INTO news (title, content, images, date) VALUES (?, ?, ?, ?)',
+                    args: [title, content, JSON.stringify(images || []), new Date().toISOString()]
+                }), TIMEOUT_MS, 'INSERT news')
+            );
             json(res, 200, { success: true });
         } catch (err) {
-            json(res, 500, { error: err.message });
+            if (err.message && err.message.includes('EAI_AGAIN')) {
+                resetClient();
+                json(res, 503, { error: 'Database DNS resolution failed.' });
+            } else {
+                json(res, 500, { error: err.message });
+            }
         }
         return;
     }
@@ -83,23 +85,37 @@ module.exports = async (req, res) => {
             return;
         }
         try {
-            await withTimeout(client.execute({
-                sql: 'UPDATE news SET title = ?, content = ?, images = ? WHERE id = ?',
-                args: [title, content, JSON.stringify(images || []), id]
-            }), TIMEOUT_MS, 'UPDATE news');
+            await withRetry(() =>
+                withTimeout(getClient().execute({
+                    sql: 'UPDATE news SET title = ?, content = ?, images = ? WHERE id = ?',
+                    args: [title, content, JSON.stringify(images || []), id]
+                }), TIMEOUT_MS, 'UPDATE news')
+            );
             json(res, 200, { success: true });
         } catch (err) {
-            json(res, 500, { error: err.message });
+            if (err.message && err.message.includes('EAI_AGAIN')) {
+                resetClient();
+                json(res, 503, { error: 'Database DNS resolution failed.' });
+            } else {
+                json(res, 500, { error: err.message });
+            }
         }
         return;
     }
 
     if (req.method === 'DELETE' && id) {
         try {
-            await withTimeout(client.execute({ sql: 'DELETE FROM news WHERE id = ?', args: [id] }), TIMEOUT_MS, 'DELETE news');
+            await withRetry(() =>
+                withTimeout(getClient().execute({ sql: 'DELETE FROM news WHERE id = ?', args: [id] }), TIMEOUT_MS, 'DELETE news')
+            );
             json(res, 200, { success: true });
         } catch (err) {
-            json(res, 500, { error: err.message });
+            if (err.message && err.message.includes('EAI_AGAIN')) {
+                resetClient();
+                json(res, 503, { error: 'Database DNS resolution failed.' });
+            } else {
+                json(res, 500, { error: err.message });
+            }
         }
         return;
     }
