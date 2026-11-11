@@ -11,8 +11,9 @@
     "eslint": "8.57.0"
   },
   "dependencies": {
-    "@libsql/client": "^0.5.0",
     "@aws-sdk/client-s3": "^3.500.0",
-    "@aws-sdk/s3-request-presigner": "^3.500.0"
+    "@aws-sdk/s3-request-presigner": "^3.500.0",
+    "@libsql/client": "^0.5.0",
+    "@tursodatabase/serverless": "^1.4.1"
   }
 }

@@ -1,4 +1,4 @@
-const { getClient, withRetry, withTimeout, json } = require('./_db.js');
+const { getConn, withRetry, withTimeout, json } = require('./_db.js');
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -18,9 +18,13 @@ module.exports = async (req, res) => {
     if (req.method === 'GET' && !id) {
         try {
             const result = await withRetry(() =>
-                withTimeout(getClient().execute("SELECT * FROM news ORDER BY date DESC"), TIMEOUT_MS, 'GET news')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare("SELECT * FROM news ORDER BY date DESC");
+                    return await stmt.all();
+                }, TIMEOUT_MS, 'GET news')
             );
-            const formatted = result.rows.map(row => ({
+            const formatted = result.map(row => ({
                 id: row.id,
                 title: row.title,
                 content: row.content,
@@ -50,10 +54,11 @@ module.exports = async (req, res) => {
         }
         try {
             await withRetry(() =>
-                withTimeout(getClient().execute({
-                    sql: "INSERT INTO news (title, content, images, date) VALUES (?, ?, ?, ?)",
-                    args: [title, content, JSON.stringify(images || []), new Date().toISOString()]
-                }), TIMEOUT_MS, 'INSERT news')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare("INSERT INTO news (title, content, images, date) VALUES (?, ?, ?, ?)");
+                    return await stmt.run(title, content, JSON.stringify(images || []), new Date().toISOString());
+                }, TIMEOUT_MS, 'INSERT news')
             );
             json(res, 200, { success: true });
         } catch (err) {
@@ -78,10 +83,11 @@ module.exports = async (req, res) => {
         }
         try {
             await withRetry(() =>
-                withTimeout(getClient().execute({
-                    sql: "UPDATE news SET title = ?, content = ?, images = ? WHERE id = ?",
-                    args: [title, content, JSON.stringify(images || []), id]
-                }), TIMEOUT_MS, 'UPDATE news')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare("UPDATE news SET title = ?, content = ?, images = ? WHERE id = ?");
+                    return await stmt.run(title, content, JSON.stringify(images || []), id);
+                }, TIMEOUT_MS, 'UPDATE news')
             );
             json(res, 200, { success: true });
         } catch (err) {
@@ -94,7 +100,11 @@ module.exports = async (req, res) => {
     if (req.method === 'DELETE' && id) {
         try {
             await withRetry(() =>
-                withTimeout(getClient().execute({ sql: "DELETE FROM news WHERE id = ?", args: [id] }), TIMEOUT_MS, 'DELETE news')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare("DELETE FROM news WHERE id = ?");
+                    return await stmt.run(id);
+                }, TIMEOUT_MS, 'DELETE news')
             );
             json(res, 200, { success: true });
         } catch (err) {

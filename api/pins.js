@@ -1,4 +1,4 @@
-const { getClient, withRetry, withTimeout, json } = require('./_db.js');
+const { getConn, withRetry, withTimeout, json } = require('./_db.js');
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -39,10 +39,11 @@ module.exports = async (req, res) => {
 
     try {
         await withRetry(() =>
-            withTimeout(getClient().execute({
-                sql: "INSERT INTO pins (pin, examId, subjects, deviceId, date) VALUES (?, ?, ?, ?, ?)",
-                args: [finalPin, examId, JSON.stringify(subjects), deviceId, new Date().toISOString()]
-            }), TIMEOUT_MS, 'INSERT pin')
+            withTimeout(async () => {
+                const conn = getConn();
+                const stmt = await conn.prepare("INSERT INTO pins (pin, examId, subjects, deviceId, date) VALUES (?, ?, ?, ?, ?)");
+                return await stmt.run(finalPin, examId, JSON.stringify(subjects), deviceId, new Date().toISOString());
+            }, TIMEOUT_MS, 'INSERT pin')
         );
         json(res, 200, { success: true, pin: finalPin });
     } catch (err) {

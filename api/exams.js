@@ -1,16 +1,22 @@
-const { getClient, resetClient, withRetry, withTimeout, json } = require('./_db.js');
+const { getConn, withRetry, withTimeout, json } = require('./_db.js');
 
 const FULL_SUBJECT_LIST = ["English Language", "Mathematics", "Biology", "Chemistry", "Physics", "Economics", "Commerce", "Principles of Accounts", "Literature-in-English", "Government", "Geography", "History", "Christian Religious Studies", "Islamic Religious Studies", "Computer Studies", "Agricultural Science", "Hausa", "Igbo", "Yoruba", "French", "Arabic", "Home Economics", "Physical and Health Education", "Art", "Music", "Civic Education"];
 
 async function initDB() {
-    const client = getClient();
-    await client.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
-    const exams = await client.execute("SELECT * FROM exams");
-    if (exams.rows.length === 0) {
+    const conn = getConn();
+    const stmt = await conn.prepare(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
+    await stmt.run();
+    const stmt2 = await conn.prepare(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
+    await stmt2.run();
+    const stmt3 = await conn.prepare(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
+    await stmt3.run();
+    const stmt4 = await conn.prepare(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);`);
+    await stmt4.run();
+    const stmt5 = await conn.prepare(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
+    await stmt5.run();
+    const stmt6 = await conn.prepare("SELECT * FROM exams");
+    const result = await stmt6.all();
+    if (result.length === 0) {
         const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
         const defaultPrices = JSON.stringify({ per_subject: 1000, per_dept: 5000, all_subjects: 8000 });
         const defaultAllow = JSON.stringify({ per_subject: true, per_dept: true, all_subjects: true });
@@ -26,10 +32,8 @@ async function initDB() {
             ['9', 'NABTEB', 'nabteb', 'nabteb-logo.png']
         ];
         for (let i = 0; i < defaults.length; i++) {
-            await client.execute({
-                sql: "INSERT INTO exams (id, name, slug, logo, prices, allow, subjects) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                args: [defaults[i][0], defaults[i][1], defaults[i][2], defaults[i][3], defaultPrices, defaultAllow, defaultSubjects]
-            });
+            const stmt7 = await conn.prepare("INSERT INTO exams (id, name, slug, logo, prices, allow, subjects) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            await stmt7.run(defaults[i][0], defaults[i][1], defaults[i][2], defaults[i][3], defaultPrices, defaultAllow, defaultSubjects);
         }
     }
 }
@@ -54,9 +58,13 @@ module.exports = async (req, res) => {
     try {
         if (req.method === 'GET' && !id) {
             const result = await withRetry(() =>
-                withTimeout(getClient().execute("SELECT * FROM exams"), TIMEOUT_MS, 'GET exams')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare("SELECT * FROM exams");
+                    return await stmt.all();
+                }, TIMEOUT_MS, 'GET exams')
             );
-            json(res, 200, result.rows.map(row => ({
+            json(res, 200, result.map(row => ({
                 _id: row.id,
                 id: row.id,
                 name: row.name,
@@ -87,7 +95,11 @@ module.exports = async (req, res) => {
             }
             args.push(id);
             await withRetry(() =>
-                withTimeout(getClient().execute({ sql: `UPDATE exams SET ${updateParts.join(', ')} WHERE id = ?`, args: args }), TIMEOUT_MS, 'PUT exams config')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare(`UPDATE exams SET ${updateParts.join(', ')} WHERE id = ?`);
+                    return await stmt.run(...args);
+                }, TIMEOUT_MS, 'PUT exams config')
             );
             json(res, 200, { success: true });
             return;
@@ -102,7 +114,11 @@ module.exports = async (req, res) => {
                 return;
             }
             const examRes = await withRetry(() =>
-                withTimeout(getClient().execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [id] }), TIMEOUT_MS, 'GET exam')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare("SELECT * FROM exams WHERE id = ?");
+                    return await stmt.all(id);
+                }, TIMEOUT_MS, 'GET exam')
             );
             if (examRes.rows.length === 0) {
                 json(res, 404, { error: 'Exam not found' });
@@ -121,7 +137,11 @@ module.exports = async (req, res) => {
                 return s;
             });
             await withRetry(() =>
-                withTimeout(getClient().execute({ sql: "UPDATE exams SET subjects = ? WHERE id = ?", args: [JSON.stringify(subjects), id] }), TIMEOUT_MS, 'PUT exam subject')
+                withTimeout(async () => {
+                    const conn = getConn();
+                    const stmt = await conn.prepare("UPDATE exams SET subjects = ? WHERE id = ?");
+                    return await stmt.run(JSON.stringify(subjects), id);
+                }, TIMEOUT_MS, 'PUT exam subject')
             );
             json(res, 200, { success: true });
             return;

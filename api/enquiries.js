@@ -1,4 +1,4 @@
-const { getClient, withRetry, withTimeout, json } = require('./_db.js');
+const { getConn, withRetry, withTimeout, json } = require('./_db.js');
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -35,10 +35,11 @@ module.exports = async (req, res) => {
 
     try {
         await withRetry(() =>
-            withTimeout(getClient().execute({
-                sql: "INSERT INTO enquiries (name, email, phone, exam, message, date) VALUES (?, ?, ?, ?, ?, ?)",
-                args: [name, email, phone || '', exam || '', message, new Date().toISOString()]
-            }), TIMEOUT_MS, 'INSERT enquiry')
+            withTimeout(async () => {
+                const conn = getConn();
+                const stmt = await conn.prepare("INSERT INTO enquiries (name, email, phone, exam, message, date) VALUES (?, ?, ?, ?, ?, ?)");
+                return await stmt.run(name, email, phone || '', exam || '', message, new Date().toISOString());
+            }, TIMEOUT_MS, 'INSERT enquiry')
         );
         json(res, 200, { success: true });
     } catch (err) {

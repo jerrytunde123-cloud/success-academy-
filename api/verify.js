@@ -1,4 +1,4 @@
-const { getClient, withRetry, withTimeout, json } = require('./_db.js');
+const { getConn, withRetry, withTimeout, json } = require('./_db.js');
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -35,28 +35,36 @@ module.exports = async (req, res) => {
 
     try {
         const pinRes = await withRetry(() =>
-            withTimeout(getClient().execute({ sql: "SELECT * FROM pins WHERE pin = ?", args: [pin.toUpperCase()] }), TIMEOUT_MS, 'GET pin')
+            withTimeout(async () => {
+                const conn = getConn();
+                const stmt = await conn.prepare("SELECT * FROM pins WHERE pin = ?");
+                return await stmt.all(pin.toUpperCase());
+            }, TIMEOUT_MS, 'GET pin')
         );
-        if (pinRes.rows.length === 0) {
+        if (pinRes.length === 0) {
             json(res, 404, { error: 'Invalid PIN' });
             return;
         }
 
-        const pinData = pinRes.rows[0];
+        const pinData = pinRes[0];
         if (pinData.deviceId !== deviceId) {
             json(res, 403, { error: 'Fraud Alert: This PIN was purchased on a different device!' });
             return;
         }
 
         const examRes = await withRetry(() =>
-            withTimeout(getClient().execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [pinData.examId] }), TIMEOUT_MS, 'GET exam')
+            withTimeout(async () => {
+                const conn = getConn();
+                const stmt = await conn.prepare("SELECT * FROM exams WHERE id = ?");
+                return await stmt.all(pinData.examId);
+            }, TIMEOUT_MS, 'GET exam')
         );
-        if (examRes.rows.length === 0) {
+        if (examRes.length === 0) {
             json(res, 404, { error: 'Exam not found' });
             return;
         }
 
-        const examData = examRes.rows[0];
+        const examData = examRes[0];
         json(res, 200, {
             success: true,
             data: {
