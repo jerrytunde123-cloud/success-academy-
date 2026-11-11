@@ -16,8 +16,36 @@ var paystackPublicKeyPromise = null;
 
 const FALLBACK_PAYSTACK_PUBLIC_KEY = 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043';
 
-function getPaystackPublicKey() {
-    if (paystackPublicKey) {
+// The Paystack inline script is loaded from a CDN, so it can still be loading
+// (or blocked by a slow connection) when the buyer clicks Pay.
+function whenPaystackReady(timeoutMs) {
+    var limit = timeoutMs || 20000;
+
+    function isReady() {
+        return typeof PaystackPop !== 'undefined' && PaystackPop && typeof PaystackPop.setup === 'function';
+    }
+
+    if (isReady()) {
+        return Promise.resolve(true);
+    }
+
+    return new Promise(function (resolve) {
+        var started = Date.now();
+        var timer = setInterval(function () {
+            if (isReady()) {
+                clearInterval(timer);
+                resolve(true);
+                return;
+            }
+            if (Date.now() - started > limit) {
+                clearInterval(timer);
+                resolve(false);
+            }
+        }, 200);
+    });
+}
+
+function getPaystackPublicKey() {    if (paystackPublicKey) {
         return Promise.resolve(paystackPublicKey);
     }
     if (paystackPublicKeyPromise) {
@@ -510,11 +538,19 @@ function payWithPaystack() {
     }
 
     if (typeof PaystackPop === 'undefined' || !PaystackPop || typeof PaystackPop.setup !== 'function') {
-        if (payButton) {
-            payButton.disabled = false;
-            payButton.innerText = originalText;
-        }
-        return alert('Payment library could not load. Please refresh and try again.');
+        // The CDN script may still be downloading: wait for it before giving up.
+        whenPaystackReady().then(function (ready) {
+            if (payButton) {
+                payButton.disabled = false;
+                payButton.innerText = originalText;
+            }
+            if (!ready) {
+                alert('Payment library could not load. Please check your internet connection and try again.');
+            } else {
+                payWithPaystack();
+            }
+        });
+        return;
     }
 
     Promise.all([
@@ -789,7 +825,7 @@ function checkSharedLink() {
     }
 }
 
-window.onload = function () {
+function initSite() {
     displayDeviceId();
     handleReturnedPayment();
 
@@ -802,4 +838,12 @@ window.onload = function () {
             checkSharedLink();
         });
     }
-};
+}
+
+// Do not wait for the window "load" event: a slow third-party asset (hero
+// image, font CDN) would delay the exam list for everyone.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSite);
+} else {
+    initSite();
+}
