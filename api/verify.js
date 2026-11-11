@@ -71,6 +71,7 @@ module.exports = async (req, res) => {
             }
         });
     } catch (err) {
+        console.error("[API] verify:", err.message);
         if (err.message && err.message.includes('EAI_AGAIN')) {
             resetClient();
             json(res, 503, { error: 'Database DNS resolution failed. Check TURSO_DATABASE_URL is correct and your Turso database is active.' });

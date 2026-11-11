@@ -22,6 +22,7 @@ module.exports = async (req, res) => {
             totalPinsSold: pinsRes.rows[0].count
         });
     } catch (err) {
+        console.error("[API] stats:", err.message);
         if (err.message && err.message.includes('EAI_AGAIN')) {
             resetClient();
             json(res, 503, { error: 'Database DNS resolution failed.' });

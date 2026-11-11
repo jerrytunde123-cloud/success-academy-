@@ -129,6 +129,7 @@ module.exports = async (req, res) => {
 
         json(res, 404, { error: 'Not found' });
     } catch (err) {
+        console.error("[API] exams:", err.message);
         if (err.message && err.message.includes('EAI_AGAIN')) {
             resetClient();
             json(res, 503, { error: 'Database DNS resolution failed. Check TURSO_DATABASE_URL is correct and your Turso database is active.' });
