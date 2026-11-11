@@ -6,7 +6,6 @@
     <title>Success Academy | Premium Exam Portal</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://js.paystack.co/v1/inline.js"></script>
 </head>
 <body>
 
@@ -145,6 +144,7 @@
                 <p id="subject-instruction" style="font-size: 13px; color: #d9534f; font-weight: bold; margin-bottom: 10px; display: none;">Please select the 9 subjects for your department.</p>
                 <div id="subject-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;"></div>
             </div>
+            <input type="email" id="checkout-email" placeholder="Your Email Address (for receipt)" required style="width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:5px; box-sizing:border-box;">
             <button class="btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button>
             <div style="text-align:center; margin-top:15px;">
                 <p style="font-size:14px; color:#666; margin-bottom:5px;">Having payment issues?</p>
@@ -170,6 +170,6 @@
         <p style="margin-top: 5px;">Serving Students Across Nigeria and West Africa</p>
     </footer>
 
-    <script src="script.js?v=12"></script>
+    <script src="script.js?v=13"></script>
 </body>
 </html>

@@ -426,6 +426,8 @@ nav a:hover {
     border-radius: 10px; 
     width: 90%; 
     max-width: 450px; 
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
 }
 

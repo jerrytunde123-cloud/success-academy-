@@ -1,0 +1,36 @@
+{
+    "env": {
+        "browser": true,
+        "node": true,
+        "es2022": true
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+        "ecmaVersion": 2022,
+        "sourceType": "script"
+    },
+    "globals": {
+        "fetch": "readonly",
+        "URL": "readonly",
+        "URLSearchParams": "readonly",
+        "AbortController": "readonly",
+        "crypto": "readonly"
+    },
+    "rules": {
+        "eqeqeq": ["error", "always"],
+        "curly": ["error", "all"],
+        "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+        "no-console": "off",
+        "no-alert": "off",
+        "no-undef": "error",
+        "no-eval": "error",
+        "no-implied-eval": "error",
+        "semi": ["error", "always"],
+        "quotes": ["error", "single", { "avoidEscape": true }]
+    },
+    "ignorePatterns": [
+        "node_modules/",
+        "assets/",
+        ".vercel/"
+    ]
+}
