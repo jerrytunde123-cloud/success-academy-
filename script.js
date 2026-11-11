@@ -25,7 +25,7 @@ function getDeviceId() {
 }
 
 function showPage(pageId) {
-    document.querySelectorAll('main').forEach(main => main.style.display = 'none');
+    document.querySelectorAll('main').forEach(main => {main.style.display = 'none';});
     const el = document.getElementById('page-' + pageId);
     if (el) {el.style.display = 'block';}
     if (pageId === 'home') {
@@ -34,17 +34,39 @@ function showPage(pageId) {
     }
 }
 
+function fetchWithTimeout(url, options, ms) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { ...options, signal: controller.signal })
+        .then(function(res) {
+            clearTimeout(timeout);
+            return res;
+        })
+        .catch(function(err) {
+            clearTimeout(timeout);
+            throw err;
+        });
+}
+
+function showApiError(msg) {
+    alert(msg);
+}
+
 async function fetchExams() {
     const grid = document.getElementById('home-exam-grid');
     if (!grid) {return;}
     grid.innerHTML = '<p style="text-align:center; color:#666;">Loading exams...</p>';
     try {
-        const res = await fetch(API_URL + '/api/exams', { cache: 'no-store' });
+        const res = await fetchWithTimeout(API_URL + '/api/exams', { cache: 'no-store' }, 10000);
         dbExams = await res.json();
+        if (!Array.isArray(dbExams)) {
+            grid.innerHTML = '<p style="color:red; text-align:center;">' + (dbExams.error || 'Failed to load exams.') + '</p>';
+            return;
+        }
         renderExams();
         checkSharedLink();
     } catch (e) {
-        grid.innerHTML = '<p style="color:red; text-align:center;">Failed to load exams.</p>';
+        grid.innerHTML = '<p style="color:red; text-align:center;">Failed to load exams: ' + e.message + '</p>';
     }
 }
 
@@ -187,7 +209,7 @@ async function generatePIN(selectedSubjects) {
         : selectedSubjects;
 
     try {
-        const res = await fetch(API_URL + '/api/pins', {
+        const res = await fetchWithTimeout(API_URL + '/api/pins', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -195,7 +217,7 @@ async function generatePIN(selectedSubjects) {
                 subjects: subjectNames,
                 deviceId: getDeviceId()
             })
-        });
+        }, 10000);
         const data = await res.json();
         if (data.success) {
             savePinLocally({
@@ -211,7 +233,7 @@ async function generatePIN(selectedSubjects) {
             alert('Error generating PIN: ' + (data.error || 'unknown'));
         }
     } catch (e) {
-        alert('Error generating PIN.');
+        alert('Error generating PIN: ' + e.message);
     }
 }
 
@@ -237,11 +259,11 @@ async function verifyAndShowContent() {
     contentDisplay.style.display = 'block';
 
     try {
-        const res = await fetch(API_URL + '/api/verify', {
+        const res = await fetchWithTimeout(API_URL + '/api/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pin: inputPin, deviceId: getDeviceId() })
-        });
+        }, 10000);
         const data = await res.json();
 
         if (!res.ok) {
@@ -270,7 +292,7 @@ async function verifyAndShowContent() {
 
         answersDiv.innerText = contentText || 'No content found. Please contact support.';
     } catch (e) {
-        errorMsg.innerText = 'Connection error. Please try again later.';
+        errorMsg.innerText = 'Connection error: ' + e.message;
         errorMsg.style.display = 'block';
         contentDisplay.style.display = 'none';
     }
@@ -285,15 +307,15 @@ function submitEnquiry(e) {
         exam: document.getElementById('exam').value,
         message: document.getElementById('message').value
     };
-    fetch(API_URL + '/api/enquiries', {
+    fetchWithTimeout(API_URL + '/api/enquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-    }).then(function() {
+    }, 10000).then(function() {
         alert('Message sent successfully!');
         document.getElementById('enquiryForm').reset();
-    }).catch(function() {
-        alert('Failed to send message.');
+    }).catch(function(e) {
+        alert('Failed to send message: ' + e.message);
     });
 }
 

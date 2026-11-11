@@ -7,21 +7,31 @@ const API_URL = ''; // Same domain (Vercel)
 
 let activeAdminExam = null;
 
+function fetchWithTimeout(url, options, ms) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { ...options, signal: controller.signal })
+        .then(function(res) { clearTimeout(timeout); return res; })
+        .catch(function(err) { clearTimeout(timeout); throw err; });
+}
+
 function adminLogin() {
     const pass = document.getElementById('admin-pass').value;
-    fetch(API_URL + '/api/admin/login', {
+    fetchWithTimeout(API_URL + '/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pass })
-    }).then(function(res) { return res.json(); })
+    }, 10000).then(function(res) { return res.json(); })
       .then(function(data) {
           if (data.ok) {
               document.getElementById('admin-login').style.display = 'none';
               document.getElementById('admin-dashboard').style.display = 'block';
               fetchExams();
           } else {
-              alert('Wrong password.');
+              alert(data.error || 'Wrong password.');
           }
+      }).catch(function(e) {
+          alert('Login failed: ' + e.message);
       });
 }
 
@@ -31,7 +41,7 @@ function adminLogout() {
 
 async function fetchExams() {
     try {
-        const res = await fetch(API_URL + '/api/exams', { cache: 'no-store' });
+        const res = await fetchWithTimeout(API_URL + '/api/exams', { cache: 'no-store' }, 10000);
         const exams = await res.json();
         const select = document.getElementById('admin-exam-select');
         select.innerHTML = '<option value="">-- Select Exam --</option>';
@@ -40,6 +50,7 @@ async function fetchExams() {
         });
     } catch (e) {
         console.error('Failed to load exams for admin', e);
+        alert('Failed to load exams: ' + e.message);
     }
 }
 
@@ -51,7 +62,7 @@ function loadExamConfig() {
         return;
     }
 
-    fetch(API_URL + '/api/exams', { cache: 'no-store' })
+    fetchWithTimeout(API_URL + '/api/exams', { cache: 'no-store' }, 10000)
         .then(function(res) { return res.json(); })
         .then(function(exams) {
             activeAdminExam = exams.find(function(e) { return (e._id || e.id) === examId; });
@@ -118,16 +129,16 @@ async function saveExamConfig() {
     };
 
     try {
-        const res = await fetch(API_URL + '/api/exams?id=' + encodeURIComponent(activeAdminExam.id), {
+        const res = await fetchWithTimeout(API_URL + '/api/exams?id=' + encodeURIComponent(activeAdminExam.id), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prices: prices, allow: allow })
-        });
+        }, 10000);
         const data = await res.json();
-        if (data.success) {alert('Configuration saved!');}
-        else {alert('Save failed: ' + (data.error || 'unknown'));}
+        if (data.success) { alert('Configuration saved!'); }
+        else { alert('Save failed: ' + (data.error || 'unknown')); }
     } catch (e) {
-        alert('Save failed.');
+        alert('Save failed: ' + e.message);
     }
 }
 
@@ -138,16 +149,16 @@ async function saveContent() {
     const imageUrl = document.getElementById('admin-image-url').value;
 
     try {
-        const res = await fetch(API_URL + '/api/exams?id=' + encodeURIComponent(activeAdminExam.id) + '&subject=' + encodeURIComponent(subject), {
+        const res = await fetchWithTimeout(API_URL + '/api/exams?id=' + encodeURIComponent(activeAdminExam.id) + '&subject=' + encodeURIComponent(subject), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subject: subject, content: content, imageUrl: imageUrl })
-        });
+        }, 10000);
         const data = await res.json();
-        if (data.success) {alert('Content saved for ' + subject + '!');}
-        else {alert('Save failed: ' + (data.error || 'unknown'));}
+        if (data.success) { alert('Content saved for ' + subject + '!'); }
+        else { alert('Save failed: ' + (data.error || 'unknown')); }
     } catch (e) {
-        alert('Save failed.');
+        alert('Save failed: ' + e.message);
     }
 }
 
