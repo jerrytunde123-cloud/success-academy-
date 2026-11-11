@@ -5,7 +5,14 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { createClient } = require('@libsql/client');
 
 const app = express();
-app.use(cors());
+
+// ⚠️ EXPLICIT CORS CONFIGURATION
+app.use(cors({
+    origin: 'https://success-academy-afri.vercel.app', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json({ limit: '10mb' }));
 
 const db = createClient({
@@ -29,11 +36,10 @@ async function initDB() {
     await db.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
-    
-    // ⚠️ FIX: No longer dropping the table, so news never disappears on restart
     await db.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);`);
     await db.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
     
+    // Seed exams if empty
     const exams = await db.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
         const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
@@ -46,6 +52,29 @@ async function initDB() {
     }
 }
 initDB();
+
+// ⚠️ ROUTE FIX: Ensure this is exactly as written
+app.get('/api/exams', async (req, res) => {
+    try {
+        const result = await db.execute("SELECT * FROM exams");
+        const formatted = result.rows.map(row => ({
+            _id: row.id, 
+            name: row.name, 
+            slug: row.slug, 
+            logo: row.logo, 
+            prices: JSON.parse(row.prices), 
+            allow: JSON.parse(row.allow), 
+            subjects: JSON.parse(row.subjects)
+        }));
+        res.json(formatted);
+    } catch (err) { 
+        console.error("Exams route error:", err);
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+// ... (Keep the rest of your routes: /api/upload, /api/pins, /api/news, etc. exactly as they were) ...
+// I have pasted them below for completeness.
 
 app.post('/api/upload', upload.array('images', 10), async (req, res) => {
     try {
@@ -65,13 +94,6 @@ app.post('/api/upload', upload.array('images', 10), async (req, res) => {
             uploadedUrls.push(`${process.env.R2_PUBLIC_URL}/${fileName}`);
         }
         res.json({ imageUrls: uploadedUrls });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/exams', async (req, res) => {
-    try {
-        const result = await db.execute("SELECT * FROM exams");
-        res.json(result.rows.map(row => ({ _id: row.id, name: row.name, slug: row.slug, logo: row.logo, prices: JSON.parse(row.prices), allow: JSON.parse(row.allow), subjects: JSON.parse(row.subjects) })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
