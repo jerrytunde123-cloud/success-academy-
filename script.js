@@ -16,23 +16,28 @@ var paystackPublicKeyPromise = null;
 
 const FALLBACK_PAYSTACK_PUBLIC_KEY = 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043';
 
+// InlineJS v2 exposes PaystackPop as a constructor with resumeTransaction().
+// We use it to open the checkout for a transaction that the backend already
+// initialized, exactly as Paystack's Accept Payments guide describes.
+function isPaystackReady() {
+    return typeof PaystackPop === 'function'
+        && PaystackPop.prototype
+        && typeof PaystackPop.prototype.resumeTransaction === 'function';
+}
+
 // The Paystack inline script is loaded from a CDN, so it can still be loading
 // (or blocked by a slow connection) when the buyer clicks Pay.
 function whenPaystackReady(timeoutMs) {
     var limit = timeoutMs || 20000;
 
-    function isReady() {
-        return typeof PaystackPop !== 'undefined' && PaystackPop && typeof PaystackPop.setup === 'function';
-    }
-
-    if (isReady()) {
+    if (isPaystackReady()) {
         return Promise.resolve(true);
     }
 
     return new Promise(function (resolve) {
         var started = Date.now();
         var timer = setInterval(function () {
-            if (isReady()) {
+            if (isPaystackReady()) {
                 clearInterval(timer);
                 resolve(true);
                 return;
@@ -45,7 +50,8 @@ function whenPaystackReady(timeoutMs) {
     });
 }
 
-function getPaystackPublicKey() {    if (paystackPublicKey) {
+function getPaystackPublicKey() {
+    if (paystackPublicKey) {
         return Promise.resolve(paystackPublicKey);
     }
     if (paystackPublicKeyPromise) {
@@ -537,7 +543,7 @@ function payWithPaystack() {
         payButton.innerText = 'Starting payment...';
     }
 
-    if (typeof PaystackPop === 'undefined' || !PaystackPop || typeof PaystackPop.setup !== 'function') {
+    if (!isPaystackReady()) {
         // The CDN script may still be downloading: wait for it before giving up.
         whenPaystackReady().then(function (ready) {
             if (payButton) {
@@ -595,27 +601,46 @@ function payWithPaystack() {
             closeModal('checkout-modal');
 
             var amountKobo = Math.round(Number(data.amount || currentPrice) * 100);
-            var handler = PaystackPop.setup({
-                key: publicKey,
-                email: email,
-                amount: amountKobo,
-                currency: data.currency || 'NGN',
-                ref: data.reference,
-                callback: function () {
-                    if (payButton) {
-                        payButton.disabled = false;
-                        payButton.innerText = originalText;
-                    }
-                    claimPayment(data.reference);
-                },
-                onClose: function () {
-                    if (payButton) {
-                        payButton.disabled = false;
-                        payButton.innerText = originalText;
-                    }
+            var popup = new PaystackPop();
+            var resetPayButton = function () {
+                if (payButton) {
+                    payButton.disabled = false;
+                    payButton.innerText = originalText;
                 }
-            });
-            handler.openIframe();
+            };
+            var callbacks = {
+                onSuccess: function (transaction) {
+                    resetPayButton();
+                    var reference = transaction && transaction.reference
+                        ? transaction.reference
+                        : data.reference;
+                    claimPayment(reference);
+                },
+                onCancel: function () {
+                    resetPayButton();
+                },
+                onError: function (error) {
+                    resetPayButton();
+                    alert((error && error.message) || 'Payment could not load. Please try again.');
+                }
+            };
+
+            if (data.accessCode) {
+                // Official Paystack flow for a backend-initialized transaction:
+                // resume it with the access code instead of initializing twice.
+                popup.resumeTransaction(data.accessCode, callbacks);
+            } else {
+                popup.newTransaction({
+                    key: publicKey,
+                    email: email,
+                    amount: amountKobo,
+                    currency: data.currency || 'NGN',
+                    reference: data.reference,
+                    onSuccess: callbacks.onSuccess,
+                    onCancel: callbacks.onCancel,
+                    onError: callbacks.onError
+                });
+            }
         })
         .catch(function (error) {
             if (payButton) {
