@@ -1,4 +1,4 @@
-const { getClient, resetClient, withRetry, withTimeout, json } = require('./_db.js');
+const { getClient, withRetry, withTimeout, json } = require('./_db.js');
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     }
 
     let body = '';
-    for await (const chunk of req) {body += chunk;}
+    for await (const chunk of req) body += chunk;
     let parsed;
     try { parsed = JSON.parse(body || '{}'); } catch (e) {
         json(res, 400, { error: 'Invalid JSON body' });
@@ -35,7 +35,7 @@ module.exports = async (req, res) => {
 
     try {
         const pinRes = await withRetry(() =>
-            withTimeout(getClient().execute({ sql: 'SELECT * FROM pins WHERE pin = ?', args: [pin.toUpperCase()] }), TIMEOUT_MS, 'GET pin')
+            withTimeout(getClient().execute({ sql: "SELECT * FROM pins WHERE pin = ?", args: [pin.toUpperCase()] }), TIMEOUT_MS, 'GET pin')
         );
         if (pinRes.rows.length === 0) {
             json(res, 404, { error: 'Invalid PIN' });
@@ -49,7 +49,7 @@ module.exports = async (req, res) => {
         }
 
         const examRes = await withRetry(() =>
-            withTimeout(getClient().execute({ sql: 'SELECT * FROM exams WHERE id = ?', args: [pinData.examId] }), TIMEOUT_MS, 'GET exam')
+            withTimeout(getClient().execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [pinData.examId] }), TIMEOUT_MS, 'GET exam')
         );
         if (examRes.rows.length === 0) {
             json(res, 404, { error: 'Exam not found' });
@@ -71,12 +71,7 @@ module.exports = async (req, res) => {
             }
         });
     } catch (err) {
-        console.error("[API] verify:", err.message);
-        if (err.message && err.message.includes('EAI_AGAIN')) {
-            resetClient();
-            json(res, 503, { error: 'Database DNS resolution failed. Check TURSO_DATABASE_URL is correct and your Turso database is active.' });
-        } else {
-            json(res, 500, { error: err.message });
-        }
+        console.error('[verify] ERROR:', err.message);
+        json(res, 500, { error: err.message });
     }
 };

@@ -1,4 +1,4 @@
-const { getClient, resetClient, withRetry, withTimeout, json } = require('./_db.js');
+const { getClient, withRetry, withTimeout, json } = require('./_db.js');
 
 module.exports = async (req, res) => {
     const TIMEOUT_MS = 30000;
@@ -6,15 +6,15 @@ module.exports = async (req, res) => {
         const today = new Date().toISOString().split('T')[0];
         const todayRes = await withRetry(() =>
             withTimeout(getClient().execute({
-                sql: 'SELECT COUNT(*) as count FROM visitors WHERE date = ?',
+                sql: "SELECT COUNT(*) as count FROM visitors WHERE date = ?",
                 args: [today]
             }), TIMEOUT_MS, 'GET visitors today')
         );
         const totalRes = await withRetry(() =>
-            withTimeout(getClient().execute('SELECT COUNT(*) as count FROM visitors'), TIMEOUT_MS, 'GET visitors total')
+            withTimeout(getClient().execute("SELECT COUNT(*) as count FROM visitors"), TIMEOUT_MS, 'GET visitors total')
         );
         const pinsRes = await withRetry(() =>
-            withTimeout(getClient().execute('SELECT COUNT(*) as count FROM pins'), TIMEOUT_MS, 'GET pins count')
+            withTimeout(getClient().execute("SELECT COUNT(*) as count FROM pins"), TIMEOUT_MS, 'GET pins count')
         );
         json(res, 200, {
             todayVisitors: todayRes.rows[0].count,
@@ -22,12 +22,7 @@ module.exports = async (req, res) => {
             totalPinsSold: pinsRes.rows[0].count
         });
     } catch (err) {
-        console.error("[API] stats:", err.message);
-        if (err.message && err.message.includes('EAI_AGAIN')) {
-            resetClient();
-            json(res, 503, { error: 'Database DNS resolution failed.' });
-        } else {
-            json(res, 500, { error: err.message });
-        }
+        console.error('[stats] ERROR:', err.message);
+        json(res, 500, { error: err.message });
     }
 };

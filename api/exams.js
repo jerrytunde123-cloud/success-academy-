@@ -1,15 +1,15 @@
 const { getClient, resetClient, withRetry, withTimeout, json } = require('./_db.js');
 
-const FULL_SUBJECT_LIST = ['English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics', 'Economics', 'Commerce', 'Principles of Accounts', 'Literature-in-English', 'Government', 'Geography', 'History', 'Christian Religious Studies', 'Islamic Religious Studies', 'Computer Studies', 'Agricultural Science', 'Hausa', 'Igbo', 'Yoruba', 'French', 'Arabic', 'Home Economics', 'Physical and Health Education', 'Art', 'Music', 'Civic Education'];
+const FULL_SUBJECT_LIST = ["English Language", "Mathematics", "Biology", "Chemistry", "Physics", "Economics", "Commerce", "Principles of Accounts", "Literature-in-English", "Government", "Geography", "History", "Christian Religious Studies", "Islamic Religious Studies", "Computer Studies", "Agricultural Science", "Hausa", "Igbo", "Yoruba", "French", "Arabic", "Home Economics", "Physical and Health Education", "Art", "Music", "Civic Education"];
 
 async function initDB() {
     const client = getClient();
-    await client.execute('CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);');
-    await client.execute('CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);');
-    await client.execute('CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);');
-    await client.execute('CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);');
-    await client.execute('CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);');
-    const exams = await client.execute('SELECT * FROM exams');
+    await client.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
+    await client.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
+    await client.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
+    await client.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);`);
+    await client.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
+    const exams = await client.execute("SELECT * FROM exams");
     if (exams.rows.length === 0) {
         const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
         const defaultPrices = JSON.stringify({ per_subject: 1000, per_dept: 5000, all_subjects: 8000 });
@@ -27,7 +27,7 @@ async function initDB() {
         ];
         for (let i = 0; i < defaults.length; i++) {
             await client.execute({
-                sql: 'INSERT INTO exams (id, name, slug, logo, prices, allow, subjects) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                sql: "INSERT INTO exams (id, name, slug, logo, prices, allow, subjects) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 args: [defaults[i][0], defaults[i][1], defaults[i][2], defaults[i][3], defaultPrices, defaultAllow, defaultSubjects]
             });
         }
@@ -54,7 +54,7 @@ module.exports = async (req, res) => {
     try {
         if (req.method === 'GET' && !id) {
             const result = await withRetry(() =>
-                withTimeout(getClient().execute('SELECT * FROM exams'), TIMEOUT_MS, 'GET exams')
+                withTimeout(getClient().execute("SELECT * FROM exams"), TIMEOUT_MS, 'GET exams')
             );
             json(res, 200, result.rows.map(row => ({
                 _id: row.id,
@@ -71,7 +71,7 @@ module.exports = async (req, res) => {
 
         if (req.method === 'PUT' && id && !subject) {
             let body = '';
-            for await (const chunk of req) {body += chunk;}
+            for await (const chunk of req) body += chunk;
             let data;
             try { data = JSON.parse(body || '{}'); } catch (e) {
                 json(res, 400, { error: 'Invalid JSON body' });
@@ -79,8 +79,8 @@ module.exports = async (req, res) => {
             }
             let updateParts = [];
             let args = [];
-            if (data.prices) { updateParts.push('prices = ?'); args.push(JSON.stringify(data.prices)); }
-            if (data.allow) { updateParts.push('allow = ?'); args.push(JSON.stringify(data.allow)); }
+            if (data.prices) { updateParts.push("prices = ?"); args.push(JSON.stringify(data.prices)); }
+            if (data.allow) { updateParts.push("allow = ?"); args.push(JSON.stringify(data.allow)); }
             if (updateParts.length === 0) {
                 json(res, 400, { error: 'Nothing to update' });
                 return;
@@ -95,14 +95,14 @@ module.exports = async (req, res) => {
 
         if (req.method === 'PUT' && id && subject) {
             let body = '';
-            for await (const chunk of req) {body += chunk;}
+            for await (const chunk of req) body += chunk;
             let data;
             try { data = JSON.parse(body || '{}'); } catch (e) {
                 json(res, 400, { error: 'Invalid JSON body' });
                 return;
             }
             const examRes = await withRetry(() =>
-                withTimeout(getClient().execute({ sql: 'SELECT * FROM exams WHERE id = ?', args: [id] }), TIMEOUT_MS, 'GET exam')
+                withTimeout(getClient().execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [id] }), TIMEOUT_MS, 'GET exam')
             );
             if (examRes.rows.length === 0) {
                 json(res, 404, { error: 'Exam not found' });
@@ -121,7 +121,7 @@ module.exports = async (req, res) => {
                 return s;
             });
             await withRetry(() =>
-                withTimeout(getClient().execute({ sql: 'UPDATE exams SET subjects = ? WHERE id = ?', args: [JSON.stringify(subjects), id] }), TIMEOUT_MS, 'PUT exam subject')
+                withTimeout(getClient().execute({ sql: "UPDATE exams SET subjects = ? WHERE id = ?", args: [JSON.stringify(subjects), id] }), TIMEOUT_MS, 'PUT exam subject')
             );
             json(res, 200, { success: true });
             return;
@@ -129,11 +129,8 @@ module.exports = async (req, res) => {
 
         json(res, 404, { error: 'Not found' });
     } catch (err) {
-        console.error("[API] exams:", err.message);
-        if (err.message && err.message.includes('EAI_AGAIN')) {
-            resetClient();
-            json(res, 503, { error: 'Database DNS resolution failed. Check TURSO_DATABASE_URL is correct and your Turso database is active.' });
-        } else if (err.message && err.message.includes('not configured')) {
+        console.error('[exams] ERROR:', err.message);
+        if (err.message && err.message.includes('not configured')) {
             json(res, 500, { error: err.message });
         } else if (err.message && err.message.includes('timed out')) {
             json(res, 504, { error: err.message });
