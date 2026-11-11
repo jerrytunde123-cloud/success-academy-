@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify PIN | Success Academy</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <header>
+        <div class="logo-container" onclick="window.location.href='index.html'">
+            <img src="assets/logo.png" alt="Logo" class="header-logo" onerror="this.src='https://via.placeholder.com/60?text=SA'">
+            <div>
+                <h1>SUCCESS ACADEMY</h1>
+                <span>Premium Exam Portal</span>
+            </div>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="index.html" style="color:var(--accent-yellow);">Back to Home</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="page-view-content" style="padding: 40px 5%; max-width: 800px; margin: 0 auto;">
+        <div class="verify-box">
+            <h2>Enter Your PIN to View Answers</h2>
+            <p style="margin-bottom: 15px; color: #666;">PINs are locked to the device they were purchased on.</p>
+            <input type="text" id="user-pin-input" placeholder="Enter 6-digit PIN" style="text-transform: uppercase;">
+            <button class="btn-buy" onclick="verifyAndShowContent()">Unlock Content</button>
+            <p id="pin-error" style="color: red; margin-top: 10px; display: none;"></p>
+        </div>
+        <div id="content-display" style="display: none; margin-top: 30px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <h3 style="color: var(--primary-blue); border-bottom: 2px solid var(--accent-yellow); padding-bottom: 10px;">Exam Answers</h3>
+            <div id="actual-answers" style="margin-top: 15px; font-family: monospace; font-size: 16px; white-space: pre-wrap;"></div>
+        </div>
+    </main>
+
+    <footer style="text-align: center; padding: 20px; background: #000; color: #aaa; font-size: 14px; margin-top: 40px;">
+        <p>&copy; 2024 Success Academy. All Rights Reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
