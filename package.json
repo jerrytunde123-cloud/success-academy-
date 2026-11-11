@@ -5,8 +5,7 @@
   "main": "api/exams.js",
   "scripts": {
     "lint": "eslint api/ script.js admin.js",
-    "test": "node test/validate.js",
-    "dev": "vercel dev"
+    "test": "node test/validate.js"
   },
   "devDependencies": {
     "eslint": "8.57.0"
