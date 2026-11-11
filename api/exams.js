@@ -5,15 +5,15 @@ const client = createClient({
     authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-const FULL_SUBJECT_LIST = ["English Language", "Mathematics", "Biology", "Chemistry", "Physics", "Economics", "Commerce", "Principles of Accounts", "Literature-in-English", "Government", "Geography", "History", "Christian Religious Studies", "Islamic Religious Studies", "Computer Studies", "Agricultural Science", "Hausa", "Igbo", "Yoruba", "French", "Arabic", "Home Economics", "Physical and Health Education", "Art", "Music", "Civic Education"];
+const FULL_SUBJECT_LIST = ['English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics', 'Economics', 'Commerce', 'Principles of Accounts', 'Literature-in-English', 'Government', 'Geography', 'History', 'Christian Religious Studies', 'Islamic Religious Studies', 'Computer Studies', 'Agricultural Science', 'Hausa', 'Igbo', 'Yoruba', 'French', 'Arabic', 'Home Economics', 'Physical and Health Education', 'Art', 'Music', 'Civic Education'];
 
 async function initDB() {
-    await client.execute(`CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);`);
-    await client.execute(`CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);`);
-    const exams = await client.execute("SELECT * FROM exams");
+    await client.execute('CREATE TABLE IF NOT EXISTS exams (id TEXT PRIMARY KEY, name TEXT, slug TEXT, logo TEXT, prices TEXT, allow TEXT, subjects TEXT);');
+    await client.execute('CREATE TABLE IF NOT EXISTS pins (pin TEXT PRIMARY KEY, examId TEXT, subjects TEXT, deviceId TEXT, date TEXT);');
+    await client.execute('CREATE TABLE IF NOT EXISTS enquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, exam TEXT, message TEXT, date TEXT);');
+    await client.execute('CREATE TABLE IF NOT EXISTS news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, images TEXT, date TEXT);');
+    await client.execute('CREATE TABLE IF NOT EXISTS visitors (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT);');
+    const exams = await client.execute('SELECT * FROM exams');
     if (exams.rows.length === 0) {
         const defaultSubjects = JSON.stringify(FULL_SUBJECT_LIST.map(name => ({ name, content: '', thumbnail: '', qaImages: [] })));
         const defaultPrices = JSON.stringify({ per_subject: 1000, per_dept: 5000, all_subjects: 8000 });
@@ -31,7 +31,7 @@ async function initDB() {
         ];
         for (let i = 0; i < defaults.length; i++) {
             await client.execute({
-                sql: "INSERT INTO exams (id, name, slug, logo, prices, allow, subjects) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                sql: 'INSERT INTO exams (id, name, slug, logo, prices, allow, subjects) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 args: [defaults[i][0], defaults[i][1], defaults[i][2], defaults[i][3], defaultPrices, defaultAllow, defaultSubjects]
             });
         }
@@ -39,24 +39,30 @@ async function initDB() {
 }
 initDB();
 
-module.exports = async (req, res) => {
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(new Error('Invalid JSON body')); }
+        });
+        req.on('error', reject);
+    });
+}
+
+function json(res, status, data) {
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(status).json(data);
+}
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-
+module.exports = async (req, res) => {
     const id = req.query.id || '';
+    const subject = req.query.subject || '';
 
-    // GET list of all exams
     if (req.method === 'GET' && !id) {
         try {
-            const result = await client.execute("SELECT * FROM exams");
-            res.status(200).json(result.rows.map(row => ({
+            const result = await client.execute('SELECT * FROM exams');
+            json(res, 200, result.rows.map(row => ({
                 _id: row.id,
                 id: row.id,
                 name: row.name,
@@ -67,70 +73,61 @@ module.exports = async (req, res) => {
                 subjects: JSON.parse(row.subjects || '[]')
             })));
         } catch (err) {
-            res.status(500).json({ error: err.message });
+            json(res, 500, { error: err.message });
         }
         return;
     }
 
-    // PUT update exam config (prices + allow)
-    if (req.method === 'PUT' && id && !req.query.subject) {
+    if (req.method === 'PUT' && id && !subject) {
         try {
-            let body = '';
-            for await (const chunk of req) body += chunk;
-            const data = JSON.parse(body);
+            const data = await parseBody(req);
             let updateParts = [];
             let args = [];
-            if (data.prices) { updateParts.push("prices = ?"); args.push(JSON.stringify(data.prices)); }
-            if (data.allow) { updateParts.push("allow = ?"); args.push(JSON.stringify(data.allow)); }
+            if (data.prices) { updateParts.push('prices = ?'); args.push(JSON.stringify(data.prices)); }
+            if (data.allow) { updateParts.push('allow = ?'); args.push(JSON.stringify(data.allow)); }
             if (updateParts.length === 0) {
-                res.status(400).json({ error: 'Nothing to update' });
+                json(res, 400, { error: 'Nothing to update' });
                 return;
             }
             args.push(id);
             await client.execute({ sql: `UPDATE exams SET ${updateParts.join(', ')} WHERE id = ?`, args: args });
-            res.status(200).json({ success: true });
+            json(res, 200, { success: true });
         } catch (err) {
-            res.status(500).json({ error: err.message });
+            json(res, 500, { error: err.message });
         }
         return;
     }
 
-    // PUT update a single subject's content + image
-    if (req.method === 'PUT' && id && req.query.subject) {
+    if (req.method === 'PUT' && id && subject) {
         try {
-            let body = '';
-            for await (const chunk of req) body += chunk;
-            const { subject, content, imageUrl } = JSON.parse(body);
-
-            const examRes = await client.execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [id] });
+            const data = await parseBody(req);
+            const examRes = await client.execute({ sql: 'SELECT * FROM exams WHERE id = ?', args: [id] });
             if (examRes.rows.length === 0) {
-                res.status(404).json({ error: 'Exam not found' });
+                json(res, 404, { error: 'Exam not found' });
                 return;
             }
             const examData = examRes.rows[0];
             let subjects = JSON.parse(examData.subjects || '[]');
-
             subjects = subjects.map(function(s) {
                 const name = typeof s === 'string' ? s : s.name;
                 if (name === subject) {
                     if (typeof s === 'string') {
-                        return { name: name, content: content || '', thumbnail: imageUrl || '', qaImages: [] };
+                        return { name: name, content: data.content || '', thumbnail: data.imageUrl || '', qaImages: [] };
                     }
-                    return { ...s, content: content || '', thumbnail: imageUrl || s.thumbnail || '', qaImages: s.qaImages || [] };
+                    return { ...s, content: data.content || '', thumbnail: data.imageUrl || s.thumbnail || '', qaImages: s.qaImages || [] };
                 }
                 return s;
             });
-
             await client.execute({
-                sql: "UPDATE exams SET subjects = ? WHERE id = ?",
+                sql: 'UPDATE exams SET subjects = ? WHERE id = ?',
                 args: [JSON.stringify(subjects), id]
             });
-            res.status(200).json({ success: true });
+            json(res, 200, { success: true });
         } catch (err) {
-            res.status(500).json({ error: err.message });
+            json(res, 500, { error: err.message });
         }
         return;
     }
 
-    res.status(404).json({ error: 'Not found' });
+    json(res, 404, { error: 'Not found' });
 };

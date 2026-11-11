@@ -27,16 +27,16 @@ function getDeviceId() {
 function showPage(pageId) {
     document.querySelectorAll('main').forEach(main => main.style.display = 'none');
     const el = document.getElementById('page-' + pageId);
-    if (el) el.style.display = 'block';
+    if (el) {el.style.display = 'block';}
     if (pageId === 'home') {
         const vc = document.getElementById('page-view-content');
-        if (vc) vc.style.display = 'none';
+        if (vc) {vc.style.display = 'none';}
     }
 }
 
 async function fetchExams() {
     const grid = document.getElementById('home-exam-grid');
-    if (!grid) return;
+    if (!grid) {return;}
     grid.innerHTML = '<p style="text-align:center; color:#666;">Loading exams...</p>';
     try {
         const res = await fetch(API_URL + '/api/exams', { cache: 'no-store' });
@@ -50,7 +50,7 @@ async function fetchExams() {
 
 function renderExams() {
     const grid = document.getElementById('home-exam-grid');
-    if (!grid) return;
+    if (!grid) {return;}
     grid.innerHTML = '';
     dbExams.forEach(function(exam) {
         const card = document.createElement('div');
@@ -65,11 +65,11 @@ function renderExams() {
 
 function openExamPackages(examId) {
     currentExam = dbExams.find(function(e) { return (e._id || e.id) === examId; });
-    if (!currentExam) return;
+    if (!currentExam) {return;}
 
     document.getElementById('pkg-exam-title').innerText = currentExam.name + ' Packages';
     const noteEl = document.getElementById('exam-note');
-    if (noteEl) noteEl.innerText = 'All ' + currentExam.name + ' questions and answers drop a day before the exam. Subscribe now to secure your PIN!';
+    if (noteEl) {noteEl.innerText = 'All ' + currentExam.name + ' questions and answers drop a day before the exam. Subscribe now to secure your PIN!';}
 
     const prices = currentExam.prices || {};
     document.getElementById('price-per-subject').innerText = prices.per_subject || 0;
@@ -128,7 +128,7 @@ function openCheckout(packageType) {
 function updatePreviewAndLimit(checkbox, max) {
     const checked = document.querySelectorAll('input[name="subject"]:checked');
     if (max === 1) {
-        checked.forEach(function(cb) { if (cb !== checkbox) cb.checked = false; });
+        checked.forEach(function(cb) { if (cb !== checkbox) {cb.checked = false;} });
     } else if (checked.length > max) {
         checkbox.checked = false;
         alert('Max ' + max + ' subjects allowed.');
@@ -229,7 +229,7 @@ async function verifyAndShowContent() {
     const contentDisplay = document.getElementById('content-display');
     const answersDiv = document.getElementById('actual-answers');
 
-    if (!inputPin) return alert('Please enter a PIN.');
+    if (!inputPin) {return alert('Please enter a PIN.');}
 
     errorMsg.style.display = 'none';
     contentDisplay.style.display = 'none';
@@ -302,7 +302,7 @@ function checkSharedLink() {
     const examSlug = params.get('exam');
     if (examSlug && dbExams.length > 0) {
         const exam = dbExams.find(e => (e.slug || e.name.toLowerCase().replace(/\s+/g, '-')) === examSlug);
-        if (exam) openExamPackages(exam._id || exam.id);
+        if (exam) {openExamPackages(exam._id || exam.id);}
     }
 }
 

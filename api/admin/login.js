@@ -1,30 +1,44 @@
-module.exports = async (req, res) => {
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(new Error('Invalid JSON body')); }
+        });
+        req.on('error', reject);
+    });
+}
+
+function json(res, status, data) {
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(status).json(data);
+}
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-
+module.exports = async (req, res) => {
     if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Method not allowed' });
+        json(res, 405, { error: 'Method not allowed' });
         return;
     }
 
     try {
-        let body = '';
-        for await (const chunk of req) body += chunk;
-        const { password } = JSON.parse(body);
+        const { password } = await parseBody(req);
+
+        if (!password || typeof password !== 'string') {
+            json(res, 400, { ok: false, error: 'Password is required' });
+            return;
+        }
+
+        if (!process.env.ADMIN_PASSWORD) {
+            json(res, 500, { ok: false, error: 'Admin password not configured' });
+            return;
+        }
 
         if (password === process.env.ADMIN_PASSWORD) {
-            res.status(200).json({ ok: true });
+            json(res, 200, { ok: true });
         } else {
-            res.status(401).json({ ok: false, error: 'Invalid password' });
+            json(res, 401, { ok: false, error: 'Invalid password' });
         }
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        json(res, 500, { error: err.message });
     }
 };

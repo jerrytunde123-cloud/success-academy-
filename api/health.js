@@ -1,4 +1,8 @@
-module.exports = async (req, res) => {
+function json(res, status, data) {
     res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({ ok: true, service: 'success-academy-api', time: new Date().toISOString() });
+    res.status(status).json(data);
+}
+
+module.exports = async (req, res) => {
+    json(res, 200, { ok: true, service: 'success-academy-api', time: new Date().toISOString() });
 };

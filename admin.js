@@ -55,7 +55,7 @@ function loadExamConfig() {
         .then(function(res) { return res.json(); })
         .then(function(exams) {
             activeAdminExam = exams.find(function(e) { return (e._id || e.id) === examId; });
-            if (!activeAdminExam) return;
+            if (!activeAdminExam) {return;}
 
             document.getElementById('exam-config-area').style.display = 'block';
             document.getElementById('content-upload-area').style.display = 'block';
@@ -86,7 +86,7 @@ function loadContentForSubject() {
     const textarea = document.getElementById('admin-content-input');
     const imageInput = document.getElementById('admin-image-url');
 
-    if (!activeAdminExam) return;
+    if (!activeAdminExam) {return;}
     const subjects = activeAdminExam.subjects || [];
     const subData = subjects.find(function(s) {
         const name = typeof s === 'string' ? s : s.name;
@@ -105,7 +105,7 @@ function loadContentForSubject() {
 }
 
 async function saveExamConfig() {
-    if (!activeAdminExam) return;
+    if (!activeAdminExam) {return;}
     const prices = {
         per_subject: parseInt(document.getElementById('price-per-subject').value) || 0,
         per_dept: parseInt(document.getElementById('price-per-dept').value) || 0,
@@ -118,34 +118,34 @@ async function saveExamConfig() {
     };
 
     try {
-        const res = await fetch(API_URL + '/api/exams/' + activeAdminExam._id + '/' + activeAdminExam.id, {
+        const res = await fetch(API_URL + '/api/exams?id=' + encodeURIComponent(activeAdminExam.id), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prices: prices, allow: allow })
         });
         const data = await res.json();
-        if (data.success) alert('Configuration saved!');
-        else alert('Save failed: ' + (data.error || 'unknown'));
+        if (data.success) {alert('Configuration saved!');}
+        else {alert('Save failed: ' + (data.error || 'unknown'));}
     } catch (e) {
         alert('Save failed.');
     }
 }
 
 async function saveContent() {
-    if (!activeAdminExam) return;
+    if (!activeAdminExam) {return;}
     const subject = document.getElementById('admin-subject-select').value;
     const content = document.getElementById('admin-content-input').value;
     const imageUrl = document.getElementById('admin-image-url').value;
 
     try {
-        const res = await fetch(API_URL + '/api/exams/' + activeAdminExam._id + '/' + activeAdminExam.id + '/subject', {
+        const res = await fetch(API_URL + '/api/exams?id=' + encodeURIComponent(activeAdminExam.id) + '&subject=' + encodeURIComponent(subject), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subject: subject, content: content, imageUrl: imageUrl })
         });
         const data = await res.json();
-        if (data.success) alert('Content saved for ' + subject + '!');
-        else alert('Save failed: ' + (data.error || 'unknown'));
+        if (data.success) {alert('Content saved for ' + subject + '!');}
+        else {alert('Save failed: ' + (data.error || 'unknown'));}
     } catch (e) {
         alert('Save failed.');
     }

@@ -9,39 +9,50 @@ const s3 = new S3Client({
     },
 });
 
-module.exports = async (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(new Error('Invalid JSON body')); }
+        });
+        req.on('error', reject);
+    });
+}
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
+function json(res, status, data) {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(status).json(data);
+}
+
+module.exports = async (req, res) => {
+    if (req.method !== 'POST') {
+        json(res, 405, { error: 'Method not allowed' });
         return;
     }
 
     try {
-        // Expects multipart/form-data. On Vercel, use a body parser or
-        // have the frontend send base64 JSON instead for simplicity.
-        // Fallback: frontend can POST { imageBase64, fileName } JSON.
-        let body = '';
-        for await (const chunk of req) body += chunk;
-        const data = JSON.parse(body);
+        const { imageBase64, fileName, contentType } = await parseBody(req);
 
-        const fileExtension = (data.fileName || 'upload').split('.').pop();
-        const fileName = 'uploads/' + Date.now() + '-' + Math.round(Math.random() * 1E9) + '.' + fileExtension;
-        const buffer = Buffer.from(data.imageBase64.split(',')[1], 'base64');
+        if (!imageBase64 || !fileName) {
+            json(res, 400, { error: 'imageBase64 and fileName are required' });
+            return;
+        }
+
+        const fileExtension = fileName.split('.').pop();
+        const safeFileName = 'uploads/' + Date.now() + '-' + Math.round(Math.random() * 1E9) + '.' + fileExtension;
+        const buffer = Buffer.from(imageBase64.split(',')[1], 'base64');
 
         await s3.send(new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
-            Key: fileName,
+            Key: safeFileName,
             Body: buffer,
-            ContentType: data.contentType || 'image/png',
+            ContentType: contentType || 'image/png',
         }));
 
-        const url = (process.env.R2_PUBLIC_URL || '') + '/' + fileName;
-        res.status(200).json({ imageUrl: url });
+        const url = (process.env.R2_PUBLIC_URL || '') + '/' + safeFileName;
+        json(res, 200, { imageUrl: url });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        json(res, 500, { error: err.message });
     }
 };

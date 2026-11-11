@@ -5,38 +5,47 @@ const client = createClient({
     authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-module.exports = async (req, res) => {
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(new Error('Invalid JSON body')); }
+        });
+        req.on('error', reject);
+    });
+}
+
+function json(res, status, data) {
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(status).json(data);
+}
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-
+module.exports = async (req, res) => {
     if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Method not allowed' });
+        json(res, 405, { error: 'Method not allowed' });
         return;
     }
 
     try {
-        let body = '';
-        for await (const chunk of req) body += chunk;
-        const { examId, subjects, deviceId, manualPin } = JSON.parse(body);
+        const { examId, subjects, deviceId, manualPin } = await parseBody(req);
+
+        if (!examId || !deviceId || !Array.isArray(subjects) || subjects.length === 0) {
+            json(res, 400, { error: 'examId, deviceId, and subjects are required' });
+            return;
+        }
 
         const finalPin = manualPin
-            ? manualPin.toUpperCase()
+            ? String(manualPin).toUpperCase()
             : Math.random().toString(36).substr(2, 6).toUpperCase();
 
         await client.execute({
-            sql: "INSERT INTO pins (pin, examId, subjects, deviceId, date) VALUES (?, ?, ?, ?, ?)",
+            sql: 'INSERT INTO pins (pin, examId, subjects, deviceId, date) VALUES (?, ?, ?, ?, ?)',
             args: [finalPin, examId, JSON.stringify(subjects), deviceId, new Date().toISOString()]
         });
 
-        res.status(200).json({ success: true, pin: finalPin });
+        json(res, 200, { success: true, pin: finalPin });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        json(res, 500, { error: err.message });
     }
 };
