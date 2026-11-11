@@ -34,7 +34,7 @@ success-academy/
 2. Checkout is created server-side with `POST /api/checkout`. The server reads prices from Turso, creates a pending order and an **inactive PIN**, then initializes a Paystack transaction. The browser is redirected to Paystack's hosted checkout.
 3. Paystack redirects back with a reference. The browser calls `POST /api/pins/claim`; the server verifies the transaction directly with Paystack (reference, amount, currency), marks the order paid, and activates the PIN. Claiming is idempotent.
 4. The PIN is bound to the device ID used at checkout. `POST /api/pins/verify` only returns the subjects that were purchased.
-5. The admin dashboard uses a signed, HttpOnly session cookie. Image uploads use short-lived presigned R2 `PUT` URLs, so files go straight from the admin browser to R2 and never pass through Vercel.
+5. The admin dashboard uses a signed, HttpOnly session cookie. Image uploads are posted to the API (max **4 MB** per image) and forwarded to R2 from the server, so the bucket needs **no CORS policy**.
 6. `GET /api/config` returns the Paystack public key (safe to expose) and whether payments are enabled. The key comes from `PAYSTACK_PUBLIC_KEY`, falling back to the built-in key in `lib/paystack.js`.
 
 ## Environment variables
@@ -86,24 +86,10 @@ The schema is created and migrated lazily on the first API request. Migrations a
 2. Create an R2 API token with **Object Read & Write** access to the bucket.
 3. Enable public access (r2.dev subdomain or a custom domain) and copy that URL into `R2_PUBLIC_URL`.
 4. Set `R2_ENDPOINT` to `https://<account-id>.r2.cloudflarestorage.com`.
-5. Add a **CORS policy** to the bucket. Browser uploads use presigned `PUT` requests, so the deployed origin must be allowed:
 
-```json
-[
-  {
-    "AllowedOrigins": [
-      "https://your-project.vercel.app",
-      "http://localhost:3000"
-    ],
-    "AllowedMethods": ["PUT"],
-    "AllowedHeaders": ["Content-Type"],
-    "ExposeHeaders": ["ETag"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
+**No CORS policy is required.** Uploads are sent to `POST /api/admin/upload` and the server forwards the bytes to R2, exactly like the previous Express backend did. Browser-direct uploads (presigned `PUT`) would need a bucket CORS rule; the server-side path avoids that and keeps working on a bucket without one.
 
-Add your custom domain and any Vercel preview domains that need uploads. Without this CORS policy, the admin browser can obtain an upload URL but R2 will block the actual upload.
+> The API forwards the request body, so images are limited to **4 MB** each (Vercel caps function request bodies at 4.5 MB). The admin dashboard tells the user this limit and rejects larger files before uploading.
 
 ## Paystack setup
 
@@ -133,7 +119,6 @@ Or connect the folder/repository to Vercel and let it build. There is no build s
 - [ ] `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` set
 - [ ] `PAYSTACK_SECRET_KEY` set (checkout is disabled without it)
 - [ ] All five R2 variables set
-- [ ] R2 bucket CORS allows the production origin
 - [ ] `/api/health` returns `200` and `{ "ok": true, "db": true }`
 - [ ] `/admin` login works and a small image upload succeeds
 - [ ] A Paystack test purchase issues a PIN and unlocks content
@@ -171,7 +156,7 @@ Open `/admin` and log in with `ADMIN_PASSWORD`.
 - **Manage News** — publish/edit/delete updates and upload up to 5 images.
 - **Enquiries** — read messages, reply by email (if Resend is configured), or open WhatsApp.
 
-Uploads need R2 configured and CORS set. If an upload fails, check the browser console/network tab for the R2 `PUT` response.
+Uploads need R2 configured. Images must be smaller than **4 MB**; the dashboard shows this limit and refuses larger files. If an upload fails, check the browser console/network tab and the API response message.
 
 ## Security notes
 
@@ -190,7 +175,7 @@ Uploads need R2 configured and CORS set. If an upload fails, check the browser c
 | `/api/health` shows `payments: false` | `PAYSTACK_SECRET_KEY` is missing or was added after the dev server started. Restart `vercel dev`. |
 | `/api/health` shows `db: false` | Turso URL/token missing or wrong. |
 | Admin login says `Admin login is not configured` | `ADMIN_PASSWORD` is missing. |
-| Upload fails with `The image could not be uploaded to R2` | R2 CORS policy, bucket name, token permissions, or `R2_PUBLIC_URL`. |
+| Upload fails with `The image could not be uploaded to R2` | The image is larger than 4 MB, is not a JPG/PNG/WebP/GIF, or the R2 credentials/bucket name are wrong. |
 | R2 upload URL is created but image URL 404s | Public access is disabled on the bucket, or `R2_PUBLIC_URL` is wrong. |
 | Payment succeeds but no PIN | The claim call failed. Use the same browser/device that started checkout, or check the pending order/PIN in `/admin`. |
 | Admin session drops immediately | Ensure `ADMIN_SESSION_SECRET` is stable across deployments; changing it invalidates existing cookies. |

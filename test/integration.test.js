@@ -21,6 +21,14 @@ const db = require('../lib/db');
 const { ensureSchema, __resetSchemaForTests } = require('../lib/schema');
 const { updateExamSubject, getExam } = require('../lib/exams');
 const { getOrder } = require('../lib/orders');
+const r2 = require('../lib/r2');
+
+// R2 uploads are mocked so the tests never contact the real bucket.
+r2.__setTestClient({
+    send: async function () {
+        return { ETag: 'fake-etag' };
+    }
+});
 
 const adapter = createSqliteAdapter();
 db.__setTestDb(adapter);
@@ -446,21 +454,23 @@ test('checkout, claim, verify and admin flows work end to end', async function (
         assert.notEqual(updated.repliedAt, null);
     });
 
-    await t.test('admin can request a presigned R2 upload', async function () {
+    await t.test('admin can upload an image to R2', async function () {
         const res = await call(adminUploadApi, {
             method: 'POST',
             url: '/api/admin/upload',
-            headers: { cookie: adminCookie },
-            body: {
-                fileName: 'answer.png',
-                contentType: 'image/png',
-                fileSize: 2048
-            }
+            headers: {
+                cookie: adminCookie,
+                'content-type': 'image/png',
+                'x-file-name': 'answer.png'
+            },
+            body: Buffer.from('fake-png-bytes')
         });
 
         assert.equal(res.statusCode, 200);
-        assert.match(res.body.uploadUrl, /X-Amz-Signature=/);
+        assert.equal(res.body.success, true);
         assert.match(res.body.publicUrl, /^https:\/\/cdn\.example\.com\/uploads\//);
+        assert.match(res.body.publicUrl, /\.png$/);
+        assert.equal(res.body.maxSizeMb, 4);
     });
 
     await t.test('logout clears the session cookie', async function () {

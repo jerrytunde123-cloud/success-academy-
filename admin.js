@@ -3,6 +3,11 @@
 
 const API_URL = '/api';
 
+// Images are uploaded through the API (Vercel functions cap request bodies at
+// 4.5 MB), so the dashboard only accepts images smaller than 4 MB.
+const MAX_UPLOAD_MB = 4;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
 var exams = [];
 var activeExam = null;
 var activeSubject = null;
@@ -306,31 +311,36 @@ async function uploadFileToR2(file) {
     if (!file) {
         throw new Error('Select an image first.');
     }
-    if (file.size > 8 * 1024 * 1024) {
-        throw new Error('Images must be smaller than 8 MB.');
+    if (file.size > MAX_UPLOAD_BYTES) {
+        throw new Error('Images must be smaller than ' + MAX_UPLOAD_MB + ' MB (this file is ' +
+            (file.size / 1024 / 1024).toFixed(1) + ' MB).');
     }
 
     var contentType = file.type || 'image/jpeg';
-    var presign = await api('/admin/upload', {
+    var response = await fetch(API_URL + '/admin/upload', {
         method: 'POST',
-        body: {
-            fileName: file.name,
-            contentType: contentType,
-            fileSize: file.size
-        }
-    });
-
-    var upload = await fetch(presign.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': contentType },
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/octet-stream',
+            'X-File-Type': contentType,
+            'X-File-Name': file.name || 'upload'
+        },
         body: file
     });
 
-    if (!upload.ok) {
-        throw new Error('The image could not be uploaded to R2. Check the bucket CORS settings.');
+    var data = {};
+    try {
+        data = await response.json();
+    } catch (_err) {
+        data = {};
     }
 
-    return presign.publicUrl;
+    if (!response.ok) {
+        throw new Error(data.error || 'The image could not be uploaded. Please try again.');
+    }
+
+    return data.publicUrl;
 }
 
 window.uploadThumbnail = async function () {
