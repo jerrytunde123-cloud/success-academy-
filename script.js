@@ -11,6 +11,41 @@ var dbExams = [];
 var currentExam = null;
 var currentPackageType = null;
 var currentPrice = 0;
+var paystackPublicKey = null;
+var paystackPublicKeyPromise = null;
+
+const FALLBACK_PAYSTACK_PUBLIC_KEY = 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043';
+
+function getPaystackPublicKey() {
+    if (paystackPublicKey) {
+        return Promise.resolve(paystackPublicKey);
+    }
+    if (paystackPublicKeyPromise) {
+        return paystackPublicKeyPromise;
+    }
+    paystackPublicKeyPromise = fetch(API_URL + '/config')
+        .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not load payment configuration.');
+                }
+                return data;
+            });
+        })
+        .then(function (data) {
+            paystackPublicKey = (data && data.paystackPublicKey) || FALLBACK_PAYSTACK_PUBLIC_KEY;
+            return paystackPublicKey;
+        })
+        .catch(function () {
+            paystackPublicKey = FALLBACK_PAYSTACK_PUBLIC_KEY;
+            return paystackPublicKey;
+        })
+        .then(function (key) {
+            paystackPublicKeyPromise = null;
+            return key;
+        });
+    return paystackPublicKeyPromise;
+}
 
 const PLACEHOLDER_SELECT = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
 const PLACEHOLDER_NO_IMAGE = 'https://placehold.co/300x150/001f5b/ffffff?text=No+Photo+Yet';
@@ -468,24 +503,33 @@ function payWithPaystack() {
         : selectedSubjects;
 
     var payButton = document.querySelector('.btn-paystack');
-    var originalText = payButton ? payButton.innerText : '';
+    var originalText = payButton ? payButton.innerText : 'Pay with Paystack';
     if (payButton) {
         payButton.disabled = true;
-        payButton.innerText = 'Redirecting to Paystack...';
+        payButton.innerText = 'Starting payment...';
     }
 
-    fetch(API_URL + '/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            examId: currentExam.id,
-            packageType: currentPackageType,
-            subjects: subjects,
-            email: email,
-            deviceId: getDeviceId()
-        })
-    })
-        .then(function (response) {
+    if (typeof PaystackPop === 'undefined' || !PaystackPop || typeof PaystackPop.setup !== 'function') {
+        if (payButton) {
+            payButton.disabled = false;
+            payButton.innerText = originalText;
+        }
+        return alert('Payment library could not load. Please refresh and try again.');
+    }
+
+    Promise.all([
+        getPaystackPublicKey(),
+        fetch(API_URL + '/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                examId: currentExam.id,
+                packageType: currentPackageType,
+                subjects: subjects,
+                email: email,
+                deviceId: getDeviceId()
+            })
+        }).then(function (response) {
             return response.json().catch(function () { return {}; }).then(function (data) {
                 if (!response.ok) {
                     throw new Error(data.error || 'Checkout failed. Please try again.');
@@ -493,7 +537,11 @@ function payWithPaystack() {
                 return data;
             });
         })
-        .then(function (data) {
+    ])
+        .then(function (results) {
+            var publicKey = results[0];
+            var data = results[1];
+
             try {
                 localStorage.setItem('sa_email', email);
                 localStorage.setItem('sa_pending_payment', JSON.stringify({
@@ -507,7 +555,31 @@ function payWithPaystack() {
             } catch (_err) {
                 // Ignore unavailable storage.
             }
-            window.location.href = data.authorizationUrl;
+
+            closeModal('checkout-modal');
+
+            var amountKobo = Math.round(Number(data.amount || currentPrice) * 100);
+            var handler = PaystackPop.setup({
+                key: publicKey,
+                email: email,
+                amount: amountKobo,
+                currency: data.currency || 'NGN',
+                ref: data.reference,
+                callback: function () {
+                    if (payButton) {
+                        payButton.disabled = false;
+                        payButton.innerText = originalText;
+                    }
+                    claimPayment(data.reference);
+                },
+                onClose: function () {
+                    if (payButton) {
+                        payButton.disabled = false;
+                        payButton.innerText = originalText;
+                    }
+                }
+            });
+            handler.openIframe();
         })
         .catch(function (error) {
             if (payButton) {

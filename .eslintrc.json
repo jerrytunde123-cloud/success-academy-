@@ -14,7 +14,8 @@
         "URL": "readonly",
         "URLSearchParams": "readonly",
         "AbortController": "readonly",
-        "crypto": "readonly"
+        "crypto": "readonly",
+        "PaystackPop": "readonly"
     },
     "rules": {
         "eqeqeq": ["error", "always"],
