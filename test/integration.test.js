@@ -28,20 +28,20 @@ __resetSchemaForTests();
 
 const examsApi = require('../api/exams');
 const checkoutApi = require('../api/checkout');
-const claimApi = require('../api/pins/claim');
-const verifyApi = require('../api/pins/verify');
+const claimApi = require('../lib/handlers/pins/claim');
+const verifyApi = require('../lib/handlers/pins/verify');
 const enquiriesApi = require('../api/enquiries');
 
-const adminLoginApi = require('../api/admin/login');
-const adminLogoutApi = require('../api/admin/logout');
-const adminSessionApi = require('../api/admin/session');
-const adminStatsApi = require('../api/admin/stats');
-const adminExamsApi = require('../api/admin/exams');
-const adminSubjectsApi = require('../api/admin/subjects');
-const adminPinsApi = require('../api/admin/pins');
-const adminNewsApi = require('../api/admin/news');
-const adminEnquiriesApi = require('../api/admin/enquiries');
-const adminUploadApi = require('../api/admin/upload');
+const adminLoginApi = require('../lib/handlers/admin/login');
+const adminLogoutApi = require('../lib/handlers/admin/logout');
+const adminSessionApi = require('../lib/handlers/admin/session');
+const adminStatsApi = require('../lib/handlers/admin/stats');
+const adminExamsApi = require('../lib/handlers/admin/exams');
+const adminSubjectsApi = require('../lib/handlers/admin/subjects');
+const adminPinsApi = require('../lib/handlers/admin/pins');
+const adminNewsApi = require('../lib/handlers/admin/news');
+const adminEnquiriesApi = require('../lib/handlers/admin/enquiries');
+const adminUploadApi = require('../lib/handlers/admin/upload');
 
 let verifyAmount = 100000;
 let verifyCurrency = 'NGN';
