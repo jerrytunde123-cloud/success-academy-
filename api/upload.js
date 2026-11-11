@@ -5,6 +5,17 @@ function json(res, status, data) {
     res.status(status).json(data);
 }
 
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(new Error('Invalid JSON body')); }
+        });
+        req.on('error', reject);
+    });
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         json(res, 405, { error: 'Method not allowed' });
@@ -25,18 +36,20 @@ module.exports = async (req, res) => {
         },
     });
 
-    let body = '';
-    for await (const chunk of req) {body += chunk;}
     let parsed;
-    try { parsed = JSON.parse(body || '{}'); } catch (e) {
-        json(res, 400, { error: 'Invalid JSON body' });
+    try {
+        parsed = await parseBody(req);
+    } catch (e) {
+        json(res, 400, { error: e.message });
         return;
     }
+
+    console.error('[upload] Received body:', JSON.stringify({ hasImageBase64: !!parsed.imageBase64, hasFileName: !!parsed.fileName, contentType: parsed.contentType, fileName: parsed.fileName }));
 
     const { imageBase64, fileName, contentType } = parsed;
 
     if (!imageBase64 || !fileName) {
-        json(res, 400, { error: 'imageBase64 and fileName are required' });
+        json(res, 400, { error: 'imageBase64 and fileName are required', received: { hasImageBase64: !!parsed.imageBase64, hasFileName: !!parsed.fileName } });
         return;
     }
 
@@ -53,8 +66,10 @@ module.exports = async (req, res) => {
         }));
 
         const url = (process.env.R2_PUBLIC_URL || '') + '/' + safeFileName;
+        console.error('[upload] Uploaded:', url);
         json(res, 200, { imageUrl: url });
     } catch (err) {
+        console.error('[upload] ERROR:', err.message);
         json(res, 500, { error: err.message });
     }
 };
