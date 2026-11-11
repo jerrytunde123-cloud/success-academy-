@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
         url: process.env.TURSO_DATABASE_URL,
         authToken: process.env.TURSO_AUTH_TOKEN,
     });
-    const TIMEOUT_MS = 10000;
+    const TIMEOUT_MS = 30000;
 
     try {
         const today = new Date().toISOString().split('T')[0];

@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
         url: process.env.TURSO_DATABASE_URL,
         authToken: process.env.TURSO_AUTH_TOKEN,
     });
-    const TIMEOUT_MS = 10000;
+    const TIMEOUT_MS = 30000;
     const id = req.query.id || '';
 
     if (req.method === 'GET' && !id) {

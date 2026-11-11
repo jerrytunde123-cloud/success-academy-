@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
         authToken: process.env.TURSO_AUTH_TOKEN,
     });
 
-    const TIMEOUT_MS = 10000;
+    const TIMEOUT_MS = 30000;
 
     if (req.method === 'GET' && !id) {
         try {
