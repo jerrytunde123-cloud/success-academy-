@@ -22,6 +22,7 @@ function json(res, status, data) {
 }
 
 module.exports = async (req, res) => {
+    console.log('[enquiries]', req.method, req.url);
     if (req.method !== 'POST') {
         json(res, 405, { error: 'Method not allowed' });
         return;
@@ -29,19 +30,23 @@ module.exports = async (req, res) => {
 
     try {
         const { name, email, phone, exam, message } = await parseBody(req);
+        console.log('[enquiries] body:', { name, email, phone, exam, message });
 
         if (!name || !email || !message) {
+            console.log('[enquiries] validation failed');
             json(res, 400, { error: 'name, email, and message are required' });
             return;
         }
 
         await client.execute({
-            sql: 'INSERT INTO enquiries (name, email, phone, exam, message, date) VALUES (?, ?, ?, ?, ?, ?)',
+            sql: "INSERT INTO enquiries (name, email, phone, exam, message, date) VALUES (?, ?, ?, ?, ?, ?)",
             args: [name, email, phone || '', exam || '', message, new Date().toISOString()]
         });
 
+        console.log('[enquiries] saved');
         json(res, 200, { success: true });
     } catch (err) {
+        console.error('[enquiries] ERROR:', err.message);
         json(res, 500, { error: err.message });
     }
 };

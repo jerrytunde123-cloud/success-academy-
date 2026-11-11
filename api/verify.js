@@ -22,6 +22,7 @@ function json(res, status, data) {
 }
 
 module.exports = async (req, res) => {
+    console.log('[verify]', req.method, req.url);
     if (req.method !== 'POST') {
         json(res, 405, { error: 'Method not allowed' });
         return;
@@ -29,13 +30,16 @@ module.exports = async (req, res) => {
 
     try {
         const { pin, deviceId } = await parseBody(req);
+        console.log('[verify] pin:', pin, 'deviceId:', deviceId);
 
         if (!pin || !deviceId) {
+            console.log('[verify] validation failed');
             json(res, 400, { error: 'PIN and deviceId are required' });
             return;
         }
 
-        const pinRes = await client.execute({ sql: 'SELECT * FROM pins WHERE pin = ?', args: [pin.toUpperCase()] });
+        const pinRes = await client.execute({ sql: "SELECT * FROM pins WHERE pin = ?", args: [pin.toUpperCase()] });
+        console.log('[verify] pin lookup rows:', pinRes.rows.length);
         if (pinRes.rows.length === 0) {
             json(res, 404, { error: 'Invalid PIN' });
             return;
@@ -43,17 +47,20 @@ module.exports = async (req, res) => {
 
         const pinData = pinRes.rows[0];
         if (pinData.deviceId !== deviceId) {
+            console.log('[verify] device mismatch');
             json(res, 403, { error: 'Fraud Alert: This PIN was purchased on a different device!' });
             return;
         }
 
-        const examRes = await client.execute({ sql: 'SELECT * FROM exams WHERE id = ?', args: [pinData.examId] });
+        const examRes = await client.execute({ sql: "SELECT * FROM exams WHERE id = ?", args: [pinData.examId] });
         if (examRes.rows.length === 0) {
+            console.log('[verify] exam not found');
             json(res, 404, { error: 'Exam not found' });
             return;
         }
 
         const examData = examRes.rows[0];
+        console.log('[verify] success for pin', pin);
         json(res, 200, {
             success: true,
             data: {
@@ -68,6 +75,7 @@ module.exports = async (req, res) => {
             }
         });
     } catch (err) {
+        console.error('[verify] ERROR:', err.message);
         json(res, 500, { error: err.message });
     }
 };

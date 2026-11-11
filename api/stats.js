@@ -11,20 +11,22 @@ function json(res, status, data) {
 }
 
 module.exports = async (req, res) => {
+    console.log('[stats]', req.method, req.url);
     try {
         const today = new Date().toISOString().split('T')[0];
         const todayRes = await client.execute({
-            sql: 'SELECT COUNT(*) as count FROM visitors WHERE date = ?',
+            sql: "SELECT COUNT(*) as count FROM visitors WHERE date = ?",
             args: [today]
         });
-        const totalRes = await client.execute('SELECT COUNT(*) as count FROM visitors');
-        const pinsRes = await client.execute('SELECT COUNT(*) as count FROM pins');
+        const totalRes = await client.execute("SELECT COUNT(*) as count FROM visitors");
+        const pinsRes = await client.execute("SELECT COUNT(*) as count FROM pins");
         json(res, 200, {
             todayVisitors: todayRes.rows[0].count,
             totalVisitors: totalRes.rows[0].count,
             totalPinsSold: pinsRes.rows[0].count
         });
     } catch (err) {
+        console.error('[stats] ERROR:', err.message);
         json(res, 500, { error: err.message });
     }
 };

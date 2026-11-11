@@ -22,11 +22,13 @@ function json(res, status, data) {
 }
 
 module.exports = async (req, res) => {
+    console.log('[news]', req.method, req.url);
     const id = req.query.id || '';
 
     if (req.method === 'GET' && !id) {
+        console.log('[news] GET all');
         try {
-            const result = await client.execute('SELECT * FROM news ORDER BY date DESC');
+            const result = await client.execute("SELECT * FROM news ORDER BY date DESC");
             const formatted = result.rows.map(row => ({
                 id: row.id,
                 title: row.title,
@@ -34,8 +36,10 @@ module.exports = async (req, res) => {
                 images: JSON.parse(row.images || '[]'),
                 date: row.date
             }));
+            console.log('[news] GET all:', formatted.length, 'items');
             json(res, 200, formatted);
         } catch (err) {
+            console.error('[news] GET ERROR:', err.message);
             json(res, 500, { error: err.message });
         }
         return;
@@ -49,7 +53,7 @@ module.exports = async (req, res) => {
                 return;
             }
             await client.execute({
-                sql: 'INSERT INTO news (title, content, images, date) VALUES (?, ?, ?, ?)',
+                sql: "INSERT INTO news (title, content, images, date) VALUES (?, ?, ?, ?)",
                 args: [title, content, JSON.stringify(images || []), new Date().toISOString()]
             });
             json(res, 200, { success: true });
@@ -67,7 +71,7 @@ module.exports = async (req, res) => {
                 return;
             }
             await client.execute({
-                sql: 'UPDATE news SET title = ?, content = ?, images = ? WHERE id = ?',
+                sql: "UPDATE news SET title = ?, content = ?, images = ? WHERE id = ?",
                 args: [title, content, JSON.stringify(images || []), id]
             });
             json(res, 200, { success: true });
@@ -79,7 +83,7 @@ module.exports = async (req, res) => {
 
     if (req.method === 'DELETE' && id) {
         try {
-            await client.execute({ sql: 'DELETE FROM news WHERE id = ?', args: [id] });
+            await client.execute({ sql: "DELETE FROM news WHERE id = ?", args: [id] });
             json(res, 200, { success: true });
         } catch (err) {
             json(res, 500, { error: err.message });

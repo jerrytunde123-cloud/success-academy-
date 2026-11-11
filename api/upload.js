@@ -26,6 +26,7 @@ function json(res, status, data) {
 }
 
 module.exports = async (req, res) => {
+    console.log('[upload]', req.method, req.url);
     if (req.method !== 'POST') {
         json(res, 405, { error: 'Method not allowed' });
         return;
@@ -33,6 +34,7 @@ module.exports = async (req, res) => {
 
     try {
         const { imageBase64, fileName, contentType } = await parseBody(req);
+        console.log('[upload] fileName:', fileName, 'hasBase64:', !!imageBase64);
 
         if (!imageBase64 || !fileName) {
             json(res, 400, { error: 'imageBase64 and fileName are required' });
@@ -51,8 +53,10 @@ module.exports = async (req, res) => {
         }));
 
         const url = (process.env.R2_PUBLIC_URL || '') + '/' + safeFileName;
+        console.log('[upload] uploaded:', url);
         json(res, 200, { imageUrl: url });
     } catch (err) {
+        console.error('[upload] ERROR:', err.message);
         json(res, 500, { error: err.message });
     }
 };

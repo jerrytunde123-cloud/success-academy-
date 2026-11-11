@@ -15,6 +15,7 @@ function json(res, status, data) {
 }
 
 module.exports = async (req, res) => {
+    console.log('[admin/login]', req.method, req.url);
     if (req.method !== 'POST') {
         json(res, 405, { error: 'Method not allowed' });
         return;
@@ -22,6 +23,7 @@ module.exports = async (req, res) => {
 
     try {
         const { password } = await parseBody(req);
+        console.log('[admin/login] password provided:', !!password);
 
         if (!password || typeof password !== 'string') {
             json(res, 400, { ok: false, error: 'Password is required' });
@@ -29,6 +31,7 @@ module.exports = async (req, res) => {
         }
 
         if (!process.env.ADMIN_PASSWORD) {
+            console.log('[admin/login] ADMIN_PASSWORD not set');
             json(res, 500, { ok: false, error: 'Admin password not configured' });
             return;
         }
@@ -39,6 +42,7 @@ module.exports = async (req, res) => {
             json(res, 401, { ok: false, error: 'Invalid password' });
         }
     } catch (err) {
+        console.error('[admin/login] ERROR:', err.message);
         json(res, 500, { error: err.message });
     }
 };
