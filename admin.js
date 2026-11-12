@@ -160,7 +160,6 @@ window.saveConfig = async function () {
     var prices = { per_subject: Number($('price-per-subject').value), per_dept: Number($('price-per-dept').value), all_subjects: Number($('price-all-subjects').value) };
     var allow = { per_subject: $('allow-per-subject').checked, per_dept: $('allow-per-dept').checked, all_subjects: $('allow-all').checked };
     
-    // ⚠️ SAVE TUTORIAL FIELDS
     var tutorialData = {
         tutorialPrice: Number($('tutorial-price').value),
         tutorialLink: $('tutorial-link').value.trim(),
