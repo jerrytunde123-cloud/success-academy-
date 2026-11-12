@@ -20,6 +20,15 @@ body {
     line-height: 1.6; 
 }
 
+button:disabled {
+    cursor: wait !important;
+    opacity: 0.65;
+}
+
+button[aria-busy="true"] {
+    cursor: wait !important;
+}
+
 /* =========================================
    HEADER & NAVIGATION
 ========================================= */

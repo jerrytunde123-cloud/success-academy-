@@ -6,6 +6,7 @@ const routes = {
     login: require('../../lib/handlers/admin/login'),
     logout: require('../../lib/handlers/admin/logout'),
     news: require('../../lib/handlers/admin/news'),
+    orders: require('../../lib/handlers/admin/orders'),
     pins: require('../../lib/handlers/admin/pins'),
     session: require('../../lib/handlers/admin/session'),
     stats: require('../../lib/handlers/admin/stats'),

@@ -21,11 +21,16 @@ const db = require('../lib/db');
 const { ensureSchema, __resetSchemaForTests } = require('../lib/schema');
 const { updateExamSubject, getExam } = require('../lib/exams');
 const { getOrder } = require('../lib/orders');
+const { getTutorialOrder } = require('../lib/tutorial-orders');
 const r2 = require('../lib/r2');
+const deletedR2Keys = [];
 
 // R2 uploads are mocked so the tests never contact the real bucket.
 r2.__setTestClient({
-    send: async function () {
+    send: async function (command) {
+        if (command.constructor.name === 'DeleteObjectCommand') {
+            deletedR2Keys.push(command.input.Key);
+        }
         return { ETag: 'fake-etag' };
     }
 });
@@ -36,6 +41,7 @@ __resetSchemaForTests();
 
 const examsApi = require('../api/exams');
 const checkoutApi = require('../api/checkout');
+const tutorialsApi = require('../api/tutorials');
 const claimApi = require('../lib/handlers/pins/claim');
 const verifyApi = require('../lib/handlers/pins/verify');
 const enquiriesApi = require('../api/enquiries');
@@ -47,6 +53,7 @@ const adminStatsApi = require('../lib/handlers/admin/stats');
 const adminExamsApi = require('../lib/handlers/admin/exams');
 const adminSubjectsApi = require('../lib/handlers/admin/subjects');
 const adminPinsApi = require('../lib/handlers/admin/pins');
+const adminOrdersApi = require('../lib/handlers/admin/orders');
 const adminNewsApi = require('../lib/handlers/admin/news');
 const adminEnquiriesApi = require('../lib/handlers/admin/enquiries');
 const adminUploadApi = require('../lib/handlers/admin/upload');
@@ -262,6 +269,9 @@ test('checkout, claim, verify and admin flows work end to end', async function (
 
         const exams = await call(adminExamsApi, { url: '/api/admin/exams' });
         assert.equal(exams.statusCode, 401);
+
+        const orders = await call(adminOrdersApi, { url: '/api/admin/orders' });
+        assert.equal(orders.statusCode, 401);
     });
 
     await t.test('admin login rejects a wrong password', async function () {
@@ -307,6 +317,42 @@ test('checkout, claim, verify and admin flows work end to end', async function (
         assert.equal(res.body.totalOrders >= 1, true);
     });
 
+    await t.test('admin cannot delete an order with payment still pending', async function () {
+        const checkout = await call(checkoutApi, postOptions({
+            examId: '1',
+            packageType: 'per_subject',
+            subjects: ['Mathematics'],
+            email: 'pending@example.com',
+            deviceId: 'DEV-PENDING123'
+        }, { 'x-forwarded-for': '10.2.0.20' }));
+        assert.equal(checkout.statusCode, 200);
+
+        const deletion = await call(adminOrdersApi, {
+            method: 'DELETE',
+            url: '/api/admin/orders?reference=' + encodeURIComponent(checkout.body.reference),
+            headers: { cookie: adminCookie }
+        });
+        assert.equal(deletion.statusCode, 409);
+        const pendingOrder = await getOrder(checkout.body.reference);
+        assert.ok(pendingOrder);
+        const pendingPinDeletion = await call(adminPinsApi, {
+            method: 'DELETE',
+            url: '/api/admin/pins?pin=' + encodeURIComponent(pendingOrder.pin),
+            headers: { cookie: adminCookie }
+        });
+        assert.equal(pendingPinDeletion.statusCode, 409);
+        assert.ok(await db.queryOne('SELECT pin FROM pins WHERE pin = ?', [pendingOrder.pin]));
+    });
+
+    await t.test('admin order history lists recorded orders', async function () {
+        const res = await call(adminOrdersApi, {
+            url: '/api/admin/orders',
+            headers: { cookie: adminCookie }
+        });
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.some(function (order) { return order.reference === reference; }), true);
+    });
+
     await t.test('admin can read and update exam content', async function () {
         const list = await call(adminExamsApi, {
             url: '/api/admin/exams',
@@ -329,16 +375,148 @@ test('checkout, claim, verify and admin flows work end to end', async function (
             headers: { cookie: adminCookie },
             body: {
                 content: 'UPDATED CONTENT',
-                thumbnail: 'https://cdn.example.com/new-thumb.png',
-                qaImages: ['https://cdn.example.com/new-qa.png']
+                thumbnail: 'https://cdn.example.com/uploads/test/thumbnail.png',
+                qaImages: ['https://cdn.example.com/uploads/test/shared-qa.png']
             }
         });
         assert.equal(update.statusCode, 200);
         assert.equal(update.body.subject.content, 'UPDATED CONTENT');
 
+        const sharedImage = await call(adminSubjectsApi, {
+            method: 'PUT',
+            url: '/api/admin/subjects?examId=1&name=Mathematics',
+            headers: { cookie: adminCookie },
+            body: {
+                content: '',
+                thumbnail: '',
+                qaImages: ['https://cdn.example.com/uploads/test/shared-qa.png']
+            }
+        });
+        assert.equal(sharedImage.statusCode, 200);
+
+        const removedImages = await call(adminSubjectsApi, {
+            method: 'PUT',
+            url: '/api/admin/subjects?examId=1&name=English%20Language',
+            headers: { cookie: adminCookie },
+            body: { content: 'UPDATED CONTENT', thumbnail: '', qaImages: [] }
+        });
+        assert.equal(removedImages.statusCode, 200);
+        assert.equal(removedImages.body.subject.thumbnail, '');
+        assert.deepEqual(removedImages.body.subject.qaImages, []);
+        assert.deepEqual(deletedR2Keys, ['uploads/test/thumbnail.png']);
+
+        const removedSharedImage = await call(adminSubjectsApi, {
+            method: 'PUT',
+            url: '/api/admin/subjects?examId=1&name=Mathematics',
+            headers: { cookie: adminCookie },
+            body: { content: '', thumbnail: '', qaImages: [] }
+        });
+        assert.equal(removedSharedImage.statusCode, 200);
+        assert.deepEqual(deletedR2Keys, ['uploads/test/thumbnail.png', 'uploads/test/shared-qa.png']);
+
         const refreshed = await getExam('1');
         const english = refreshed.subjects.find(function (subject) { return subject.name === 'English Language'; });
         assert.equal(english.content, 'UPDATED CONTENT');
+        assert.equal(english.thumbnail, '');
+        assert.deepEqual(english.qaImages, []);
+    });
+
+    await t.test('admin can configure public tutorial details safely', async function () {
+        const updated = await call(adminExamsApi, {
+            method: 'PUT',
+            url: '/api/admin/exams',
+            headers: { cookie: adminCookie },
+            body: {
+                id: '1',
+                tutorialPrice: 1500,
+                tutorialLink: 'https://chat.whatsapp.com/example',
+                tutorialBenefits: 'Live lessons and revision notes.'
+            }
+        });
+        assert.equal(updated.statusCode, 200);
+        assert.equal(updated.body.exam.tutorialPrice, 1500);
+        assert.equal(updated.body.exam.tutorialLink, 'https://chat.whatsapp.com/example');
+
+        const publicList = await call(examsApi, { url: '/api/exams' });
+        const waec = publicList.body.find(function (exam) { return exam.id === '1'; });
+        assert.equal(waec.tutorialPrice, 1500);
+        assert.equal(waec.tutorialBenefits, 'Live lessons and revision notes.');
+        assert.equal(waec.tutorialAvailable, true);
+        assert.equal(Object.prototype.hasOwnProperty.call(waec, 'tutorialLink'), false);
+
+        const invalid = await call(adminExamsApi, {
+            method: 'PUT',
+            url: '/api/admin/exams',
+            headers: { cookie: adminCookie },
+            body: { id: '1', tutorialPrice: -1 }
+        });
+        assert.equal(invalid.statusCode, 400);
+
+        const missingLink = await call(adminExamsApi, {
+            method: 'PUT',
+            url: '/api/admin/exams',
+            headers: { cookie: adminCookie },
+            body: { id: '2', tutorialPrice: 1500 }
+        });
+        assert.equal(missingLink.statusCode, 400);
+    });
+
+    await t.test('tutorial checkout verifies stored amount and exam before revealing class link', async function () {
+        const initialized = await call(tutorialsApi, postOptions({
+            action: 'initialize',
+            examId: '1',
+            email: 'tutorial@example.com'
+        }, { 'x-forwarded-for': '10.5.0.1' }));
+        assert.equal(initialized.statusCode, 200);
+        assert.match(initialized.body.reference, /^TUT_[A-F0-9]{16}$/);
+        assert.equal(initialized.body.accessCode, 'test_access_code');
+
+        const order = await getTutorialOrder(initialized.body.reference);
+        assert.equal(order.examId, '1');
+        assert.equal(order.tutorialLink, 'https://chat.whatsapp.com/example');
+        assert.equal(order.amount, 150000);
+        assert.equal(order.status, 'pending');
+
+        const wrongExam = await call(tutorialsApi, postOptions({
+            action: 'verify',
+            examId: '2',
+            reference: initialized.body.reference
+        }, { 'x-forwarded-for': '10.5.0.2' }));
+        assert.equal(wrongExam.statusCode, 404);
+
+        verifyAmount = 100000;
+        const wrongAmount = await call(tutorialsApi, postOptions({
+            action: 'verify',
+            examId: '1',
+            reference: initialized.body.reference
+        }, { 'x-forwarded-for': '10.5.0.3' }));
+        assert.equal(wrongAmount.statusCode, 400);
+        assert.equal((await getTutorialOrder(initialized.body.reference)).status, 'pending');
+
+        verifyAmount = 150000;
+        const verified = await call(tutorialsApi, postOptions({
+            action: 'verify',
+            reference: initialized.body.reference
+        }, { 'x-forwarded-for': '10.5.0.4' }));
+        assert.equal(verified.statusCode, 200);
+        assert.equal(verified.body.examId, '1');
+        assert.equal(verified.body.examName, 'WAEC');
+        assert.equal(verified.body.link, 'https://chat.whatsapp.com/example');
+        assert.equal((await getTutorialOrder(initialized.body.reference)).status, 'paid');
+
+        await call(adminExamsApi, {
+            method: 'PUT',
+            url: '/api/admin/exams',
+            headers: { cookie: adminCookie },
+            body: { id: '1', tutorialPrice: 0, tutorialLink: '', tutorialBenefits: '' }
+        });
+        const verifiedAfterTutorialWasDisabled = await call(tutorialsApi, postOptions({
+            action: 'verify',
+            reference: initialized.body.reference
+        }, { 'x-forwarded-for': '10.5.0.5' }));
+        assert.equal(verifiedAfterTutorialWasDisabled.statusCode, 200);
+        assert.equal(verifiedAfterTutorialWasDisabled.body.link, 'https://chat.whatsapp.com/example');
+        verifyAmount = 100000;
     });
 
     await t.test('admin PIN history includes active and pending PINs', async function () {
@@ -372,6 +550,16 @@ test('checkout, claim, verify and admin flows work end to end', async function (
         const row = await db.queryOne('SELECT * FROM pins WHERE pin = ?', ['MANUAL1']);
         assert.equal(Number(row.active), 1);
         assert.deepEqual(JSON.parse(row.subjects), ['Mathematics']);
+    });
+
+    await t.test('admin can permanently delete a manual PIN', async function () {
+        const deleted = await call(adminPinsApi, {
+            method: 'DELETE',
+            url: '/api/admin/pins?pin=MANUAL1',
+            headers: { cookie: adminCookie }
+        });
+        assert.equal(deleted.statusCode, 200);
+        assert.equal(await db.queryOne('SELECT pin FROM pins WHERE pin = ?', ['MANUAL1']), null);
     });
 
     let newsId = null;
@@ -452,6 +640,14 @@ test('checkout, claim, verify and admin flows work end to end', async function (
         });
         const updated = afterReply.body.find(function (entry) { return entry.id === enquiry.id; });
         assert.notEqual(updated.repliedAt, null);
+
+        const deleted = await call(adminEnquiriesApi, {
+            method: 'DELETE',
+            url: '/api/admin/enquiries?id=' + enquiry.id,
+            headers: { cookie: adminCookie }
+        });
+        assert.equal(deleted.statusCode, 200);
+        assert.equal(await db.queryOne('SELECT id FROM enquiries WHERE id = ?', [enquiry.id]), null);
     });
 
     await t.test('admin can upload an image to R2', async function () {
@@ -512,5 +708,16 @@ test('checkout, claim, verify and admin flows work end to end', async function (
             headers: { cookie: adminCookie }
         });
         assert.equal(list.body.some(function (item) { return item.id === newsId; }), false);
+    });
+
+    await t.test('deleting a paid order also revokes its linked PIN', async function () {
+        const res = await call(adminOrdersApi, {
+            method: 'DELETE',
+            url: '/api/admin/orders?reference=' + encodeURIComponent(reference),
+            headers: { cookie: adminCookie }
+        });
+        assert.equal(res.statusCode, 200);
+        assert.equal(await getOrder(reference), null);
+        assert.equal(await db.queryOne('SELECT pin FROM pins WHERE pin = ?', [pin]), null);
     });
 });

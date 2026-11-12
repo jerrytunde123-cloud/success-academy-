@@ -40,6 +40,10 @@ test('migrate() upgrades the legacy schema without losing existing data', async 
         await migrate(adapter);
 
         assert.equal(await hasColumn(adapter, 'exams', 'updatedAt'), true);
+        assert.equal(await hasColumn(adapter, 'exams', 'tutorialPrice'), true);
+        assert.equal(await hasColumn(adapter, 'exams', 'tutorialLink'), true);
+        assert.equal(await hasColumn(adapter, 'exams', 'tutorialBenefits'), true);
+        assert.equal(await hasColumn(adapter, 'tutorial_orders', 'tutorialLink'), true);
         assert.equal(await hasColumn(adapter, 'pins', 'orderRef'), true);
         assert.equal(await hasColumn(adapter, 'pins', 'active'), true);
         assert.equal(await hasColumn(adapter, 'pins', 'lastUsedAt'), true);
@@ -68,7 +72,7 @@ test('migrate() upgrades the legacy schema without losing existing data', async 
 
         const tables = await adapter.query("SELECT name FROM sqlite_master WHERE type = 'table'");
         const names = tables.map(function (row) { return row.name; });
-        ['orders', 'rate_limits', 'meta', 'exams', 'pins', 'enquiries', 'news', 'visitors'].forEach(function (table) {
+        ['orders', 'tutorial_orders', 'rate_limits', 'meta', 'exams', 'pins', 'enquiries', 'news', 'visitors'].forEach(function (table) {
             assert.equal(names.indexOf(table) !== -1, true, 'missing table: ' + table);
         });
 

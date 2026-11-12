@@ -10,8 +10,84 @@ var allNews = [];
 var allEnquiries = [];
 var currentReplyData = null;
 var editingNewsImages = [];
+var currentDeleteResolve = null;
+var currentDeleteRequiresPhrase = false;
 
 function $(id) { return document.getElementById(id); }
+
+/* eslint-disable-next-line no-unused-vars */
+async function withButtonLoading(button, loadingText, action) {
+    if (!button || button.disabled) {
+        return;
+    }
+    var originalContent = button.innerHTML;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = loadingText;
+    try {
+        return await action();
+    } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        if (button.textContent === loadingText) {
+            button.innerHTML = originalContent;
+        }
+    }
+}
+
+function confirmDeletion(title, description, requirePhrase) {
+    if (currentDeleteResolve) {
+        currentDeleteResolve(false);
+    }
+    currentDeleteRequiresPhrase = Boolean(requirePhrase);
+    setText('delete-title', title);
+    setText('delete-description', description);
+    $('delete-phrase-area').style.display = currentDeleteRequiresPhrase ? 'block' : 'none';
+    $('delete-phrase').value = '';
+    $('confirm-delete').disabled = currentDeleteRequiresPhrase;
+    $('delete-modal').style.display = 'flex';
+    if (currentDeleteRequiresPhrase) {
+        $('delete-phrase').focus();
+    } else {
+        $('cancel-delete').focus();
+    }
+
+    return new Promise(function (resolve) {
+        currentDeleteResolve = resolve;
+    });
+}
+
+function finishDeletion(confirmed) {
+    if (!currentDeleteResolve) {
+        return;
+    }
+    if (confirmed && currentDeleteRequiresPhrase && $('delete-phrase').value !== 'DELETE') {
+        return;
+    }
+    var resolve = currentDeleteResolve;
+    currentDeleteResolve = null;
+    currentDeleteRequiresPhrase = false;
+    $('delete-modal').style.display = 'none';
+    $('delete-phrase').value = '';
+    $('confirm-delete').disabled = false;
+    resolve(confirmed);
+}
+
+$('delete-phrase').addEventListener('input', function () {
+    $('confirm-delete').disabled = currentDeleteRequiresPhrase && $('delete-phrase').value !== 'DELETE';
+});
+$('cancel-delete').addEventListener('click', function () { finishDeletion(false); });
+$('confirm-delete').addEventListener('click', function () { finishDeletion(true); });
+$('delete-modal').addEventListener('click', function (event) {
+    if (event.target === $('delete-modal')) {
+        finishDeletion(false);
+    }
+});
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+        finishDeletion(false);
+    }
+});
 
 function escapeHtml(value) {
     return String(value === undefined || value === null ? '' : value)
@@ -46,7 +122,13 @@ function showDashboard() {
     $('dashboard').style.display = 'block';
 }
 
-function setText(id, value) { var el = $(id); if (el) el.innerText = value; }
+function setText(id, value) { var el = $(id); if (el) {el.innerText = value;} }
+
+function showCleanupWarning(result) {
+    if (result && result.warning) {
+        alert(result.warning);
+    }
+}
 
 window.checkPassword = async function () {
     var password = $('admin-password').value;
@@ -54,7 +136,7 @@ window.checkPassword = async function () {
     var button = document.querySelector('#login-screen .save-btn');
     if (!password) { errorEl.innerText = 'Enter your admin password.'; errorEl.style.display = 'block'; return; }
     errorEl.style.display = 'none';
-    button.disabled = true; button.innerText = 'Logging in...';
+    button.disabled = true; button.setAttribute('aria-busy', 'true'); button.innerText = 'Logging in...';
     try {
         await api('/admin/login', { method: 'POST', body: { password: password } });
         showDashboard();
@@ -63,34 +145,38 @@ window.checkPassword = async function () {
         errorEl.innerText = err.message || 'Incorrect Password!';
         errorEl.style.display = 'block';
     } finally {
-        button.disabled = false; button.innerText = 'Login';
+        button.disabled = false; button.removeAttribute('aria-busy'); button.innerText = 'Login';
     }
 };
 
 window.logout = async function () {
-    try { await api('/admin/logout', { method: 'POST' }); } catch (_err) {}
+    try {
+        await api('/admin/logout', { method: 'POST' });
+    } catch (_err) {
+        // The local session is discarded even if the server session already expired.
+    }
     activeExam = null; activeSubject = null; exams = [];
     showLoginScreen();
 };
 
-window.switchTab = function (tabId, event) {
+window.switchTab = async function (tabId, event) {
     document.querySelectorAll('.tab').forEach(function (tab) { tab.classList.remove('active'); });
     document.querySelectorAll('.section').forEach(function (section) { section.classList.remove('active'); });
-    if (event && event.target) event.target.classList.add('active');
+    if (event && event.target) {event.target.classList.add('active');}
     var target = $('tab-' + tabId);
-    if (target) target.classList.add('active');
-    if (tabId === 'enquiries') loadEnquiries();
-    if (tabId === 'pins') loadPinHistory();
-    if (tabId === 'news') loadNews();
+    if (target) {
+        target.classList.add('active');
+    }
+
+    if (tabId === 'enquiries') { await loadEnquiries(); }
+    if (tabId === 'pins') { await loadPinHistory(); }
+    if (tabId === 'orders') { await loadOrders(); }
+    if (tabId === 'news') { await loadNews(); }
 };
 
 async function initDashboard() {
-    try {
-        var stats = await api('/admin/stats');
-        setText('stat-today', stats.todayVisitors);
-        setText('stat-total', stats.totalVisitors);
-        setText('stat-pins', stats.totalPinsSold);
-    } catch (_err) {}
+    await initDashboardStats();
+
     var select = $('exam-select');
     select.innerHTML = '<option value="">-- Select Exam --</option>';
     try {
@@ -101,6 +187,21 @@ async function initDashboard() {
         exams.forEach(function (exam) { manualSelect.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>'; });
         window.loadManualSubjects();
     } catch (err) { select.innerHTML = '<option value="">-- Could not load exams --</option>'; alert(err.message); }
+}
+
+async function initDashboardStats() {
+    try {
+        var stats = await api('/admin/stats');
+        setText('stat-today', stats.todayVisitors);
+        setText('stat-total', stats.totalVisitors);
+        setText('stat-pins', stats.totalPinsSold);
+        setText('stats-error', '');
+    } catch (err) {
+        setText('stat-today', 'N/A');
+        setText('stat-total', 'N/A');
+        setText('stat-pins', 'N/A');
+        setText('stats-error', 'Statistics could not be loaded: ' + err.message);
+    }
 }
 
 window.loadExamConfig = async function () {
@@ -126,37 +227,104 @@ window.loadExamConfig = async function () {
     var subSelect = $('subject-select');
     subSelect.innerHTML = '';
     activeExam.subjects.forEach(function (sub) { subSelect.innerHTML += '<option value="' + escapeHtml(sub.name) + '">' + escapeHtml(sub.name) + '</option>'; });
-    if (activeExam.subjects.length > 0) window.loadSubjectData();
+    if (activeExam.subjects.length > 0) {window.loadSubjectData();}
 };
 
 window.loadSubjectData = function () {
-    if (!activeExam) return;
+    if (!activeExam) {return;}
     var subName = $('subject-select').value;
     activeSubject = activeExam.subjects.find(function (subject) { return subject.name === subName; });
-    if (!activeSubject) return;
+    if (!activeSubject) {return;}
     $('content-input').value = activeSubject.content || '';
     var thumbPreview = $('thumbnail-preview');
-    if (activeSubject.thumbnail) thumbPreview.innerHTML = '<img src="' + escapeHtml(activeSubject.thumbnail) + '" alt="Thumbnail" style="width:100px; height:100px; object-fit:cover; border-radius:5px;">';
-    else thumbPreview.innerHTML = '<p style="font-size:12px; color:#666;">No thumbnail.</p>';
-    var gallery = $('qa-gallery'); gallery.innerHTML = '';
+    if (activeSubject.thumbnail) {
+        thumbPreview.innerHTML = '<img src="' + escapeHtml(activeSubject.thumbnail) + '" alt="Thumbnail" style="width:100px; height:100px; object-fit:cover; border-radius:5px;"> <button type="button" class="danger-btn" onclick="withButtonLoading(this, \'Deleting...\', removeThumbnail)">Delete thumbnail</button>';
+    } else {
+        thumbPreview.innerHTML = '<p style="font-size:12px; color:#666;">No thumbnail.</p>';
+    }
+
+    var gallery = $('qa-gallery');
+    gallery.innerHTML = '';
     var images = Array.isArray(activeSubject.qaImages) ? activeSubject.qaImages : [];
-    if (images.length === 0) gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images.</p>';
-    else images.forEach(function (imgUrl, index) { gallery.innerHTML += '<div class="image-thumbnail"><img src="' + escapeHtml(imgUrl) + '" alt="Q&A image"><button class="delete-img-btn" type="button" onclick="removeQAImage(' + index + ')">&times;</button></div>'; });
+    if (images.length === 0) {
+        gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images.</p>';
+    } else {
+        images.forEach(function (imgUrl, index) {
+            gallery.innerHTML += '<div class="image-thumbnail"><img src="' + escapeHtml(imgUrl) + '" alt="Q&A image"><button class="delete-img-btn" type="button" aria-label="Delete Q&A image ' + (index + 1) + '" onclick="withButtonLoading(this, \'Deleting...\', () => removeQAImage(' + index + '))">&times;</button></div>';
+        });
+    }
 };
 
-async function saveActiveSubjectToDB() {
-    if (!activeExam || !activeSubject) return;
-    await api('/admin/subjects?examId=' + encodeURIComponent(activeExam.id) + '&name=' + encodeURIComponent(activeSubject.name), { method: 'PUT', body: { content: activeSubject.content, thumbnail: activeSubject.thumbnail, qaImages: activeSubject.qaImages } });
+async function saveActiveSubjectToDB(subject) {
+    var target = subject || activeSubject;
+    if (!activeExam || !target) {
+        return;
+    }
+
+    return api(
+        '/admin/subjects?examId=' + encodeURIComponent(activeExam.id) + '&name=' + encodeURIComponent(target.name),
+        {
+            method: 'PUT',
+            body: {
+                content: target.content,
+                thumbnail: target.thumbnail,
+                qaImages: target.qaImages
+            }
+        }
+    );
 }
 
 window.removeQAImage = async function (index) {
-    if (!activeSubject || !confirm('Delete this image?')) return;
-    activeSubject.qaImages.splice(index, 1);
-    try { await saveActiveSubjectToDB(); window.loadSubjectData(); } catch (err) { alert('Failed to save: ' + err.message); }
+    if (!activeSubject) {
+        return;
+    }
+
+    var imageUrl = activeSubject.qaImages[index];
+    if (!imageUrl || !await confirmDeletion(
+        'Are you sure you want to delete this Q&A image?',
+        'This permanently removes the image from this subject. If no other content uses it, its stored file will also be deleted.'
+    )) {
+        return;
+    }
+
+    var updatedSubject = Object.assign({}, activeSubject, {
+        qaImages: activeSubject.qaImages.filter(function (_url, imageIndex) {
+            return imageIndex !== index;
+        })
+    });
+    try {
+        var result = await saveActiveSubjectToDB(updatedSubject);
+        activeSubject.qaImages = updatedSubject.qaImages;
+        window.loadSubjectData();
+        showCleanupWarning(result);
+    } catch (err) {
+        alert('Failed to save: ' + err.message);
+    }
+};
+
+window.removeThumbnail = async function () {
+    if (!activeSubject || !activeSubject.thumbnail) {
+        return;
+    }
+    if (!await confirmDeletion(
+        'Are you sure you want to delete this thumbnail?',
+        'The thumbnail will be removed from the public subject page. If no other content uses it, its stored file will also be deleted.'
+    )) {
+        return;
+    }
+    var updatedSubject = Object.assign({}, activeSubject, { thumbnail: '' });
+    try {
+        var result = await saveActiveSubjectToDB(updatedSubject);
+        activeSubject.thumbnail = '';
+        window.loadSubjectData();
+        showCleanupWarning(result);
+    } catch (err) {
+        alert('Failed to save: ' + err.message);
+    }
 };
 
 window.saveConfig = async function () {
-    if (!activeExam) return;
+    if (!activeExam) {return;}
     var prices = { per_subject: Number($('price-per-subject').value), per_dept: Number($('price-per-dept').value), all_subjects: Number($('price-all-subjects').value) };
     var allow = { per_subject: $('allow-per-subject').checked, per_dept: $('allow-per-dept').checked, all_subjects: $('allow-all').checked };
     
@@ -220,8 +388,10 @@ window.uploadThumbnail = async function () {
 
     try {
         var imageUrl = await uploadFileToR2(fileInput.files[0]);
+        var updatedSubject = Object.assign({}, activeSubject, { thumbnail: imageUrl });
+        var result = await saveActiveSubjectToDB(updatedSubject);
         activeSubject.thumbnail = imageUrl;
-        await saveActiveSubjectToDB();
+        showCleanupWarning(result);
         alert('Thumbnail Uploaded!');
         fileInput.value = '';
         window.loadSubjectData();
@@ -252,8 +422,9 @@ window.uploadQAImages = async function () {
         for (var index = 0; index < fileInput.files.length; index++) {
             newUrls.push(await uploadFileToR2(fileInput.files[index]));
         }
-        activeSubject.qaImages = currentQA.concat(newUrls);
-        await saveActiveSubjectToDB();
+        var updatedSubject = Object.assign({}, activeSubject, { qaImages: currentQA.concat(newUrls) });
+        await saveActiveSubjectToDB(updatedSubject);
+        activeSubject.qaImages = updatedSubject.qaImages;
         alert('Q&A Images Uploaded!');
         fileInput.value = '';
         window.loadSubjectData();
@@ -267,9 +438,10 @@ window.saveTextContent = async function () {
         return alert('Select a subject first.');
     }
 
-    activeSubject.content = $('content-input').value;
+    var updatedSubject = Object.assign({}, activeSubject, { content: $('content-input').value });
     try {
-        await saveActiveSubjectToDB();
+        await saveActiveSubjectToDB(updatedSubject);
+        activeSubject.content = updatedSubject.content;
         alert('Text Answers Saved!');
     } catch (err) {
         alert('Failed to save: ' + err.message);
@@ -319,7 +491,7 @@ window.generateManualPin = async function () {
             }
         });
         alert('PIN Generated: ' + result.pin);
-        loadPinHistory();
+        await loadPinHistory();
     } catch (err) {
         alert(err.message);
     }
@@ -332,7 +504,7 @@ async function loadPinHistory() {
     try {
         var pins = await api('/admin/pins');
         if (!Array.isArray(pins) || pins.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#666;">No PINs yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#666;">No PINs yet.</td></tr>';
             return;
         }
 
@@ -347,12 +519,81 @@ async function loadPinHistory() {
                     '<td style="font-weight:bold; color:green;">' + escapeHtml(pin.pin) + status + '</td>' +
                     '<td><code>' + escapeHtml(pin.deviceId) + '</code></td>' +
                     '<td>' + escapeHtml(subjects) + '</td>' +
+                    '<td><button type="button" class="danger-btn" onclick="withButtonLoading(this, \'Deleting...\', () => deletePin(\'' + escapeHtml(pin.pin) + '\'))">Delete</button></td>' +
                 '</tr>';
         });
     } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="5" style="color:red;">' + escapeHtml(err.message) + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="color:red;">' + escapeHtml(err.message) + '</td></tr>';
     }
 }
+
+window.deletePin = async function (pin) {
+    if (!await confirmDeletion(
+        'Are you sure you want to delete PIN ' + pin + '?',
+        'This permanently removes the PIN and revokes access. Its order/payment history, if any, remains. This cannot be undone.',
+        true
+    )) {
+        return;
+    }
+    try {
+        await api('/admin/pins?pin=' + encodeURIComponent(pin), { method: 'DELETE' });
+        await loadPinHistory();
+        await initDashboardStats();
+    } catch (err) {
+        alert(err.message);
+    }
+};
+
+async function loadOrders() {
+    var tbody = $('orders-table-body');
+    tbody.innerHTML = '';
+    try {
+        var orders = await api('/admin/orders');
+        if (!Array.isArray(orders) || orders.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#666;">No orders yet.</td></tr>';
+            return;
+        }
+        orders.forEach(function (order) {
+            var date = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+            var amount = Number(order.amount) / 100;
+            var formattedAmount = new Intl.NumberFormat('en-NG', {
+                style: 'currency',
+                currency: order.currency || 'NGN'
+            }).format(amount);
+            var pending = order.status === 'pending';
+            tbody.innerHTML +=
+                '<tr>' +
+                    '<td>' + escapeHtml(date) + '</td>' +
+                    '<td><code>' + escapeHtml(order.reference) + '</code></td>' +
+                    '<td>' + escapeHtml(order.email) + '</td>' +
+                    '<td>' + escapeHtml(formattedAmount) + '</td>' +
+                    '<td>' + escapeHtml(order.status) + '</td>' +
+                    '<td><code>' + escapeHtml(order.pin) + '</code></td>' +
+                    '<td><button type="button" class="danger-btn" ' + (pending ? 'disabled title="Pending orders cannot be deleted"' : 'onclick="withButtonLoading(this, \'Deleting...\', () => deleteOrder(\'' + escapeHtml(order.reference) + '\'))"') + '>Delete</button></td>' +
+                '</tr>';
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:red;">' + escapeHtml(err.message) + '</td></tr>';
+    }
+}
+
+window.deleteOrder = async function (reference) {
+    if (!await confirmDeletion(
+        'Are you sure you want to delete order ' + reference + '?',
+        'This permanently removes the order and payment history. If paid, its linked PIN is also deleted and access is revoked. This cannot be undone.',
+        true
+    )) {
+        return;
+    }
+    try {
+        await api('/admin/orders?reference=' + encodeURIComponent(reference), { method: 'DELETE' });
+        await loadOrders();
+        await loadPinHistory();
+        await initDashboardStats();
+    } catch (err) {
+        alert(err.message);
+    }
+};
 
 window.saveNews = async function () {
     var id = $('edit-news-id').value;
@@ -387,16 +628,18 @@ window.saveNews = async function () {
 
     try {
         var body = { title: title, content: content, images: imageUrls };
+        var result;
         if (id) {
             body.id = Number(id);
-            await api('/admin/news?id=' + encodeURIComponent(id), { method: 'PUT', body: body });
+            result = await api('/admin/news?id=' + encodeURIComponent(id), { method: 'PUT', body: body });
         } else {
-            await api('/admin/news', { method: 'POST', body: body });
+            result = await api('/admin/news', { method: 'POST', body: body });
         }
 
         alert(id ? 'News Updated!' : 'News Published!');
+        showCleanupWarning(result);
         window.resetNewsForm();
-        loadNews();
+        await loadNews();
     } catch (err) {
         alert(err.message);
         button.innerText = id ? 'Update News' : 'Publish Update';
@@ -419,10 +662,14 @@ window.editNews = function (id) {
     window.scrollTo(0, 0);
 };
 
-window.copyNewsLink = function (id) {
+window.copyNewsLink = async function (id) {
     var url = window.location.origin + '/#news-' + id;
-    navigator.clipboard.writeText(url);
-    alert('Direct link copied: ' + url);
+    try {
+        await navigator.clipboard.writeText(url);
+        alert('Direct link copied: ' + url);
+    } catch (error) {
+        alert('Could not copy the update link. ' + (error.message || ''));
+    }
 };
 
 window.resetNewsForm = function () {
@@ -469,9 +716,9 @@ async function loadNews() {
                         imagesHtml +
                     '</div>' +
                     '<div style="display:flex; flex-direction:column; gap:5px;">' +
-                        '<button type="button" onclick="editNews(' + Number(item.id) + ')" style="background:#ffcc00; color:#001f5b; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-weight:bold;">Edit</button>' +
-                        '<button type="button" onclick="copyNewsLink(' + Number(item.id) + ')" style="background:#0088cc; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Copy Link</button>' +
-                        '<button type="button" onclick="deleteNews(' + Number(item.id) + ')" style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Delete</button>' +
+                        '<button type="button" onclick="withButtonLoading(this, \'Opening...\', () => editNews(' + Number(item.id) + '))" style="background:#ffcc00; color:#001f5b; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; font-weight:bold;">Edit</button>' +
+                        '<button type="button" onclick="withButtonLoading(this, \'Copying...\', () => copyNewsLink(' + Number(item.id) + '))" style="background:#0088cc; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Copy Link</button>' +
+                        '<button type="button" onclick="withButtonLoading(this, \'Deleting...\', () => deleteNews(' + Number(item.id) + '))" style="background:red; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Delete</button>' +
                     '</div>' +
                 '</div>';
         });
@@ -481,13 +728,22 @@ async function loadNews() {
 }
 
 window.deleteNews = async function (id) {
-    if (!confirm('Delete this update?')) {
+    var item = allNews.find(function (news) { return news.id === id; });
+    var title = item ? item.title : 'this update';
+    if (!await confirmDeletion(
+        'Are you sure you want to delete "' + title + '"?',
+        'This permanently deletes the update and its images (unless an image is still used elsewhere).'
+    )) {
         return;
     }
 
     try {
-        await api('/admin/news?id=' + encodeURIComponent(id), { method: 'DELETE' });
-        loadNews();
+        var result = await api('/admin/news?id=' + encodeURIComponent(id), { method: 'DELETE' });
+        if ($('edit-news-id').value === String(id)) {
+            window.resetNewsForm();
+        }
+        await loadNews();
+        showCleanupWarning(result);
     } catch (err) {
         alert(err.message);
     }
@@ -520,8 +776,9 @@ async function loadEnquiries() {
                     '<td>' + escapeHtml(enq.exam) + '</td>' +
                     '<td>' + escapeHtml(enq.message) + '</td>' +
                     '<td style="display: flex; gap: 5px; flex-wrap: wrap;">' +
-                        '<button type="button" onclick="openReply(' + Number(enq.id) + ')" style="background: #0088cc; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;">Email</button>' +
+                        '<button type="button" onclick="withButtonLoading(this, \'Opening...\', () => openReply(' + Number(enq.id) + '))" style="background: #0088cc; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;">Email</button>' +
                         '<a href="' + escapeHtml(waLink) + '" target="_blank" rel="noopener" style="background: #25D366; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px; text-decoration: none; display: inline-block;">WhatsApp</a>' +
+                        '<button type="button" class="danger-btn" onclick="withButtonLoading(this, \'Deleting...\', () => deleteEnquiry(' + Number(enq.id) + '))">Delete</button>' +
                     '</td>' +
                 '</tr>';
         });
@@ -529,6 +786,25 @@ async function loadEnquiries() {
         tbody.innerHTML = '<tr><td colspan="7" style="color:red;">' + escapeHtml(err.message) + '</td></tr>';
     }
 }
+
+window.deleteEnquiry = async function (id) {
+    var enquiry = allEnquiries.find(function (item) { return item.id === id; });
+    var identity = enquiry ? (enquiry.name || enquiry.email || ('enquiry #' + id)) : ('enquiry #' + id);
+    if (!await confirmDeletion(
+        'Are you sure you want to delete the enquiry from ' + identity + '?',
+        'This permanently deletes the customer enquiry and its reply status. This cannot be undone.',
+        true
+    )) {
+        return;
+    }
+    try {
+        await api('/admin/enquiries?id=' + encodeURIComponent(id), { method: 'DELETE' });
+        await loadEnquiries();
+        await initDashboardStats();
+    } catch (err) {
+        alert(err.message);
+    }
+};
 
 window.openReply = function (id) {
     var enquiry = allEnquiries.find(function (item) { return item.id === id; });

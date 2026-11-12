@@ -9,7 +9,7 @@ process.env.R2_PUBLIC_URL = 'https://cdn.example.com/';
 
 const r2 = require('../lib/r2');
 
-const { extensionFor, normalizeContentType, uploadImage } = r2;
+const { extensionFor, normalizeContentType, uploadImage, deleteImage } = r2;
 
 function fakeClient() {
     const sent = [];
@@ -52,6 +52,19 @@ test('images are uploaded to R2 from the server', async function () {
     assert.match(result.key, /^uploads\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]+\.png$/);
     assert.match(result.publicUrl, /^https:\/\/cdn\.example\.com\/uploads\/\d{4}-\d{2}-\d{2}\//);
     assert.equal(result.size, body.length);
+});
+
+test('image deletion only removes managed upload keys', async function () {
+    const client = fakeClient();
+    r2.__setTestClient(client);
+
+    assert.equal(await deleteImage('https://cdn.example.com/uploads/2026-11-11/image.png'), true);
+    assert.equal(client.sent[0].input.Bucket, 'success-academy-test');
+    assert.equal(client.sent[0].input.Key, 'uploads/2026-11-11/image.png');
+
+    assert.equal(await deleteImage('https://other.example.com/uploads/image.png'), false);
+    assert.equal(await deleteImage('https://cdn.example.com/uploads/%2e%2e/private.png'), false);
+    assert.equal(client.sent.length, 1);
 });
 
 test('oversized, empty and unsupported images are rejected', async function () {

@@ -87,7 +87,9 @@
         <div id="tutorial-details" style="display: none; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
             <h3 id="tut-exam-name" style="color: var(--primary-blue); margin-bottom: 15px;"></h3>
             <div id="tut-benefits" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; white-space: pre-wrap;"></div>
-            <div style="text-align: center;">
+            <div id="tutorial-checkout-form" style="text-align: center;">
+                <label for="tutorial-email" style="display:block; text-align:left; max-width:300px; margin:0 auto 6px;">Email for your payment receipt</label>
+                <input type="email" id="tutorial-email" autocomplete="email" placeholder="Your email address" required style="width:100%; max-width:300px; padding:12px; margin-bottom:15px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
                 <h4 style="color: green; font-size: 24px;">₦<span id="tut-price"></span></h4>
                 <p style="font-size: 12px; color: #666; margin-bottom: 15px;">One-time payment for lifetime access</p>
                 <button class="btn-buy" onclick="payForTutorial()" style="width: 100%; max-width: 300px;">Pay & Join Class</button>
@@ -133,13 +135,13 @@
         <div style="background: #eef2f5; border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
             <p style="font-size: 14px; color: #666; margin-bottom: 5px;">Your Unique Device ID:</p>
             <h3 id="user-device-id-display" style="color: var(--primary-blue); letter-spacing: 1px; font-family: monospace; margin-bottom: 10px;">Loading...</h3>
-            <button onclick="copyDeviceId()" style="background: var(--accent-yellow); border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;"><i class="fas fa-copy"></i> Copy ID</button>
+            <button onclick="withButtonLoading(this, 'Copying...', copyDeviceId)" style="background: var(--accent-yellow); border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 12px;"><i class="fas fa-copy"></i> Copy ID</button>
         </div>
 
         <div class="verify-box">
             <h2>Enter Your PIN to View Answers</h2>
             <input type="text" id="user-pin-input" placeholder="Enter 6-digit PIN" style="text-transform: uppercase;">
-            <button class="btn-buy" onclick="verifyAndShowContent()">Unlock Content</button>
+            <button class="btn-buy" onclick="withButtonLoading(this, 'Loading answers...', verifyAndShowContent)">Unlock Content</button>
             <p id="pin-error" style="color: red; margin-top: 10px; display: none;"></p>
         </div>
         <div id="content-display">
@@ -163,7 +165,8 @@
             <button class="btn-paystack" onclick="payWithPaystack()">Pay with Paystack</button>
             <div style="text-align:center; margin-top:15px;">
                 <p style="font-size:14px; color:#666; margin-bottom:5px;">Having payment issues?</p>
-                <a href="https://wa.me/2347048135078" target="_blank" rel="noopener noreferrer" style="background:#25D366; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block;"><i class="fab fa-whatsapp"></i> Contact Support</a>
+                <a href="https://wa.me/2347048135078" target="_blank" rel="noopener noreferrer" style="background:#25D366; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block;"><i class="fab fa-whatsapp"></i> WhatsApp Support</a>
+                <a href="https://t.me/Officialkingjay1" target="_blank" rel="noopener noreferrer" style="background:#0088cc; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-size:14px; display:inline-block; margin-left:6px;"><i class="fab fa-telegram"></i> Telegram Support</a>
             </div>
             <button class="btn-cancel" onclick="closeModal('checkout-modal')" style="margin-top: 15px;">Cancel</button>
         </div>

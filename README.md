@@ -10,6 +10,7 @@ success-academy/
 │   ├── visitors.js      POST /api/visitors
 │   ├── enquiries.js     POST /api/enquiries
 │   ├── checkout.js      POST /api/checkout
+│   ├── tutorials.js     GET/POST /api/tutorials
 │   ├── config.js        GET  /api/config
 │   ├── health.js        GET  /api/health
 │   ├── pins/
@@ -31,11 +32,12 @@ success-academy/
 ## How it works
 
 1. The browser loads exams from `GET /api/exams`. Subject answer content and private Q&A images are **not** included in this response.
-2. Checkout is created server-side with `POST /api/checkout`. The server reads prices from Turso, creates a pending order and an **inactive PIN**, then initializes a Paystack transaction. The browser is redirected to Paystack's hosted checkout.
+2. Checkout is created server-side with `POST /api/checkout`. The server reads prices from Turso, creates a pending order and an **inactive PIN**, then initializes a Paystack transaction. The browser opens Paystack checkout.
 3. Paystack redirects back with a reference. The browser calls `POST /api/pins/claim`; the server verifies the transaction directly with Paystack (reference, amount, currency), marks the order paid, and activates the PIN. Claiming is idempotent.
 4. The PIN is bound to the device ID used at checkout. `POST /api/pins/verify` only returns the subjects that were purchased.
 5. The admin dashboard uses a signed, HttpOnly session cookie. Image uploads are posted to the API (max **4 MB** per image) and forwarded to R2 from the server, so the bucket needs **no CORS policy**.
 6. `GET /api/config` returns the Paystack public key (safe to expose) and whether payments are enabled. The key comes from `PAYSTACK_PUBLIC_KEY`, falling back to the built-in key in `lib/paystack.js`.
+7. Tutorial enrollment is configured per exam in the admin dashboard. A priced tutorial must have a secure HTTPS class link to be listed publicly. `POST /api/tutorials` creates a pending order with a snapshot of the class link and initializes Paystack; after checkout, the server verifies the stored reference, amount, and currency before returning that link, even if the admin later changes the listing. The same verification works when Paystack returns the browser to the site.
 
 ## Environment variables
 
@@ -73,8 +75,9 @@ The API uses Turso's official serverless driver (`@tursodatabase/serverless`) th
 The schema is created and migrated lazily on the first API request. Migrations are **additive and idempotent**:
 
 - Existing tables `exams`, `pins`, `enquiries`, `news`, `visitors` are kept.
-- New tables: `orders`, `rate_limits`, `meta`.
-- New columns: `exams.updatedAt`, `pins.orderRef`, `pins.active`, `pins.lastUsedAt`, `enquiries.repliedAt`, `news.updatedAt`.
+- New tables: `orders`, `tutorial_orders`, `rate_limits`, `meta`.
+- New column: `tutorial_orders.tutorialLink` stores the class link attached to an enrollment order.
+- New columns: `exams.updatedAt`, `exams.tutorialPrice`, `exams.tutorialLink`, `exams.tutorialBenefits`, `pins.orderRef`, `pins.active`, `pins.lastUsedAt`, `enquiries.repliedAt`, `news.updatedAt`.
 - Existing PINs get `active = 1`, so previously issued PINs keep working.
 - Existing exams and PIN data are not overwritten. Missing default exams are seeded with `INSERT OR IGNORE`.
 
@@ -94,7 +97,7 @@ The schema is created and migrated lazily on the first API request. Migrations a
 ## Paystack setup
 
 1. Add `PAYSTACK_SECRET_KEY` in Vercel. The public site never receives the secret key.
-2. Paystack returns the buyer to the site automatically with `?reference=…&trxref=…`. If you use a custom domain, set `PUBLIC_BASE_URL` to it; otherwise leave it unset.
+2. Paystack returns the buyer to the site automatically with `?reference=…&trxref=…`. Tutorial references are verified against their stored tutorial orders before the class link is shown. If you use a custom domain, set `PUBLIC_BASE_URL` to it; otherwise leave it unset.
 3. Checkout uses Paystack's hosted page, so the frontend does not need the public key to complete a payment. `PAYSTACK_PUBLIC_KEY` is exposed by `GET /api/config` for any client-side Paystack use, and falls back to the built-in key when the variable is not set.
 4. Amounts are stored and compared in **kobo** (`price × 100`), and currency is verified as `NGN`.
 5. Use test keys first. A test transaction can be completed with Paystack's test cards. Switch to live keys only when ready.
@@ -145,16 +148,19 @@ npm run lint
 npm test
 ```
 
-Tests use an in-memory `node:sqlite` database and a mocked Paystack API; they do **not** touch your Turso database. `npm test` covers schema migration, package rules, admin auth, R2 presigning, and the full checkout → claim → verify flow.
+Tests use an in-memory `node:sqlite` database and a mocked Paystack API; they do **not** touch your Turso database. `npm test` covers schema migration, package rules, admin auth, R2 image handling, admin record deletion, and the full checkout → claim → verify flow.
 
 ## Admin dashboard
 
 Open `/admin` and log in with `ADMIN_PASSWORD`.
 
-- **Manage Exams** — edit package prices and availability; edit subject text answers, public thumbnails, and private Q&A images.
-- **PIN History** — see every PIN (paid and pending) and create manual PINs for a device ID.
+- **Manage Exams** — edit package prices and availability; edit subject text answers, public thumbnails, and private Q&A images. Subject thumbnails and Q&A images can be removed.
+- **PIN History** — see every PIN (paid and pending), create manual PINs for a device ID, and permanently delete PINs. Deleting a PIN revokes access but keeps any related order history.
+- **Orders** — review payment records. Pending orders cannot be deleted while payment may still complete. Deleting a paid order also deletes its linked PIN and revokes access.
 - **Manage News** — publish/edit/delete updates and upload up to 5 images.
-- **Enquiries** — read messages, reply by email (if Resend is configured), or open WhatsApp.
+- **Enquiries** — read, delete, and reply to messages by email (if Resend is configured) or WhatsApp.
+
+All admin deletions require confirmation and are permanent. Removed R2 images are deleted from storage only when no exam or news content still references them.
 
 Uploads need R2 configured. Images must be smaller than **4 MB**; the dashboard shows this limit and refuses larger files. If an upload fails, check the browser console/network tab and the API response message.
 
