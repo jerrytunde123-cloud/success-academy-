@@ -1,10 +1,5 @@
 // Success Academy — admin dashboard logic.
-// Authentication is a signed HttpOnly cookie issued by /api/admin/login.
-
 const API_URL = '/api';
-
-// Images are uploaded through the API (Vercel functions cap request bodies at
-// 4.5 MB), so the dashboard only accepts images smaller than 4 MB.
 const MAX_UPLOAD_MB = 4;
 const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
@@ -16,50 +11,26 @@ var allEnquiries = [];
 var currentReplyData = null;
 var editingNewsImages = [];
 
-function $(id) {
-    return document.getElementById(id);
-}
+function $(id) { return document.getElementById(id); }
 
 function escapeHtml(value) {
     return String(value === undefined || value === null ? '' : value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 async function api(path, options) {
     var opts = options || {};
-    var config = {
-        method: opts.method || 'GET',
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: {}
-    };
-
-    if (opts.body !== undefined) {
-        config.headers['Content-Type'] = 'application/json';
-        config.body = JSON.stringify(opts.body);
-    }
-
+    var config = { method: opts.method || 'GET', cache: 'no-store', credentials: 'same-origin', headers: {} };
+    if (opts.body !== undefined) { config.headers['Content-Type'] = 'application/json'; config.body = JSON.stringify(opts.body); }
     var response = await fetch(API_URL + path, config);
     var data = {};
-    try {
-        data = await response.json();
-    } catch (_err) {
-        data = {};
-    }
-
+    try { data = await response.json(); } catch (_err) { data = {}; }
     if (!response.ok) {
-        if (response.status === 401) {
-            showLoginScreen();
-        }
+        if (response.status === 401) { showLoginScreen(); }
         var error = new Error(data.error || 'Request failed. Please try again.');
         error.status = response.status;
         throw error;
     }
-
     return data;
 }
 
@@ -75,28 +46,15 @@ function showDashboard() {
     $('dashboard').style.display = 'block';
 }
 
-function setText(id, value) {
-    var el = $(id);
-    if (el) {
-        el.innerText = value;
-    }
-}
+function setText(id, value) { var el = $(id); if (el) el.innerText = value; }
 
 window.checkPassword = async function () {
     var password = $('admin-password').value;
     var errorEl = $('login-error');
     var button = document.querySelector('#login-screen .save-btn');
-
-    if (!password) {
-        errorEl.innerText = 'Enter your admin password.';
-        errorEl.style.display = 'block';
-        return;
-    }
-
+    if (!password) { errorEl.innerText = 'Enter your admin password.'; errorEl.style.display = 'block'; return; }
     errorEl.style.display = 'none';
-    button.disabled = true;
-    button.innerText = 'Logging in...';
-
+    button.disabled = true; button.innerText = 'Logging in...';
     try {
         await api('/admin/login', { method: 'POST', body: { password: password } });
         showDashboard();
@@ -105,42 +63,25 @@ window.checkPassword = async function () {
         errorEl.innerText = err.message || 'Incorrect Password!';
         errorEl.style.display = 'block';
     } finally {
-        button.disabled = false;
-        button.innerText = 'Login';
+        button.disabled = false; button.innerText = 'Login';
     }
 };
 
 window.logout = async function () {
-    try {
-        await api('/admin/logout', { method: 'POST' });
-    } catch (_err) {
-        // The cookie may already be invalid.
-    }
-    activeExam = null;
-    activeSubject = null;
-    exams = [];
+    try { await api('/admin/logout', { method: 'POST' }); } catch (_err) {}
+    activeExam = null; activeSubject = null; exams = [];
     showLoginScreen();
 };
 
 window.switchTab = function (tabId, event) {
-    document.querySelectorAll('.tab').forEach(function (tab) {
-        tab.classList.remove('active');
-    });
-    document.querySelectorAll('.section').forEach(function (section) {
-        section.classList.remove('active');
-    });
-
-    if (event && event.target) {
-        event.target.classList.add('active');
-    }
+    document.querySelectorAll('.tab').forEach(function (tab) { tab.classList.remove('active'); });
+    document.querySelectorAll('.section').forEach(function (section) { section.classList.remove('active'); });
+    if (event && event.target) event.target.classList.add('active');
     var target = $('tab-' + tabId);
-    if (target) {
-        target.classList.add('active');
-    }
-
-    if (tabId === 'enquiries') { loadEnquiries(); }
-    if (tabId === 'pins') { loadPinHistory(); }
-    if (tabId === 'news') { loadNews(); }
+    if (target) target.classList.add('active');
+    if (tabId === 'enquiries') loadEnquiries();
+    if (tabId === 'pins') loadPinHistory();
+    if (tabId === 'news') loadNews();
 };
 
 async function initDashboard() {
@@ -149,162 +90,88 @@ async function initDashboard() {
         setText('stat-today', stats.todayVisitors);
         setText('stat-total', stats.totalVisitors);
         setText('stat-pins', stats.totalPinsSold);
-    } catch (_err) {
-        // Stats are non-critical; the rest of the dashboard can still load.
-    }
-
+    } catch (_err) {}
     var select = $('exam-select');
     select.innerHTML = '<option value="">-- Select Exam --</option>';
-
     try {
         exams = await api('/admin/exams');
-        exams.forEach(function (exam) {
-            select.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>';
-        });
-
+        exams.forEach(function (exam) { select.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>'; });
         var manualSelect = $('manual-exam-select');
         manualSelect.innerHTML = '';
-        exams.forEach(function (exam) {
-            manualSelect.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>';
-        });
+        exams.forEach(function (exam) { manualSelect.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>'; });
         window.loadManualSubjects();
-    } catch (err) {
-        select.innerHTML = '<option value="">-- Could not load exams --</option>';
-        alert(err.message);
-    }
+    } catch (err) { select.innerHTML = '<option value="">-- Could not load exams --</option>'; alert(err.message); }
 }
 
 window.loadExamConfig = async function () {
     var id = $('exam-select').value;
-    if (!id) {
-        $('config-area').style.display = 'none';
-        $('content-area').style.display = 'none';
-        return;
-    }
-
-    try {
-        activeExam = await api('/admin/exams?id=' + encodeURIComponent(id));
-    } catch (err) {
-        alert(err.message);
-        return;
-    }
-
+    if (!id) { $('config-area').style.display = 'none'; $('content-area').style.display = 'none'; return; }
+    try { activeExam = await api('/admin/exams?id=' + encodeURIComponent(id)); } catch (err) { alert(err.message); return; }
     activeSubject = null;
     $('config-area').style.display = 'block';
     $('content-area').style.display = 'block';
     setText('config-name', activeExam.name);
-
     $('price-per-subject').value = activeExam.prices.per_subject;
     $('allow-per-subject').checked = activeExam.allow.per_subject;
     $('price-per-dept').value = activeExam.prices.per_dept;
     $('allow-per-dept').checked = activeExam.allow.per_dept;
     $('price-all-subjects').value = activeExam.prices.all_subjects;
     $('allow-all').checked = activeExam.allow.all_subjects;
+    
+    // ⚠️ LOAD TUTORIAL FIELDS
+    $('tutorial-price').value = activeExam.tutorialPrice || 0;
+    $('tutorial-link').value = activeExam.tutorialLink || '';
+    $('tutorial-benefits').value = activeExam.tutorialBenefits || '';
 
     var subSelect = $('subject-select');
     subSelect.innerHTML = '';
-    activeExam.subjects.forEach(function (sub) {
-        subSelect.innerHTML += '<option value="' + escapeHtml(sub.name) + '">' + escapeHtml(sub.name) + '</option>';
-    });
-
-    if (activeExam.subjects.length > 0) {
-        window.loadSubjectData();
-    }
+    activeExam.subjects.forEach(function (sub) { subSelect.innerHTML += '<option value="' + escapeHtml(sub.name) + '">' + escapeHtml(sub.name) + '</option>'; });
+    if (activeExam.subjects.length > 0) window.loadSubjectData();
 };
 
 window.loadSubjectData = function () {
-    if (!activeExam) {
-        return;
-    }
-
+    if (!activeExam) return;
     var subName = $('subject-select').value;
-    activeSubject = activeExam.subjects.find(function (subject) {
-        return subject.name === subName;
-    });
-
-    if (!activeSubject) {
-        return;
-    }
-
+    activeSubject = activeExam.subjects.find(function (subject) { return subject.name === subName; });
+    if (!activeSubject) return;
     $('content-input').value = activeSubject.content || '';
-
     var thumbPreview = $('thumbnail-preview');
-    if (activeSubject.thumbnail) {
-        thumbPreview.innerHTML = '<img src="' + escapeHtml(activeSubject.thumbnail) + '" alt="Thumbnail" style="width:100px; height:100px; object-fit:cover; border-radius:5px;">';
-    } else {
-        thumbPreview.innerHTML = '<p style="font-size:12px; color:#666;">No thumbnail.</p>';
-    }
-
-    var gallery = $('qa-gallery');
-    gallery.innerHTML = '';
+    if (activeSubject.thumbnail) thumbPreview.innerHTML = '<img src="' + escapeHtml(activeSubject.thumbnail) + '" alt="Thumbnail" style="width:100px; height:100px; object-fit:cover; border-radius:5px;">';
+    else thumbPreview.innerHTML = '<p style="font-size:12px; color:#666;">No thumbnail.</p>';
+    var gallery = $('qa-gallery'); gallery.innerHTML = '';
     var images = Array.isArray(activeSubject.qaImages) ? activeSubject.qaImages : [];
-    if (images.length === 0) {
-        gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images.</p>';
-    } else {
-        images.forEach(function (imgUrl, index) {
-            gallery.innerHTML += '<div class="image-thumbnail"><img src="' + escapeHtml(imgUrl) + '" alt="Q&A image"><button class="delete-img-btn" type="button" onclick="removeQAImage(' + index + ')">&times;</button></div>';
-        });
-    }
+    if (images.length === 0) gallery.innerHTML = '<p style="font-size:12px; color:#666;">No Q&A images.</p>';
+    else images.forEach(function (imgUrl, index) { gallery.innerHTML += '<div class="image-thumbnail"><img src="' + escapeHtml(imgUrl) + '" alt="Q&A image"><button class="delete-img-btn" type="button" onclick="removeQAImage(' + index + ')">&times;</button></div>'; });
 };
 
 async function saveActiveSubjectToDB() {
-    if (!activeExam || !activeSubject) {
-        return;
-    }
-
-    await api(
-        '/admin/subjects?examId=' + encodeURIComponent(activeExam.id) + '&name=' + encodeURIComponent(activeSubject.name),
-        {
-            method: 'PUT',
-            body: {
-                content: activeSubject.content,
-                thumbnail: activeSubject.thumbnail,
-                qaImages: activeSubject.qaImages
-            }
-        }
-    );
+    if (!activeExam || !activeSubject) return;
+    await api('/admin/subjects?examId=' + encodeURIComponent(activeExam.id) + '&name=' + encodeURIComponent(activeSubject.name), { method: 'PUT', body: { content: activeSubject.content, thumbnail: activeSubject.thumbnail, qaImages: activeSubject.qaImages } });
 }
 
 window.removeQAImage = async function (index) {
-    if (!activeSubject || !confirm('Delete this image?')) {
-        return;
-    }
-
+    if (!activeSubject || !confirm('Delete this image?')) return;
     activeSubject.qaImages.splice(index, 1);
-    try {
-        await saveActiveSubjectToDB();
-        window.loadSubjectData();
-    } catch (err) {
-        alert('Failed to save: ' + err.message);
-    }
+    try { await saveActiveSubjectToDB(); window.loadSubjectData(); } catch (err) { alert('Failed to save: ' + err.message); }
 };
 
 window.saveConfig = async function () {
-    if (!activeExam) {
-        return;
-    }
-
-    var prices = {
-        per_subject: Number($('price-per-subject').value),
-        per_dept: Number($('price-per-dept').value),
-        all_subjects: Number($('price-all-subjects').value)
-    };
-    var allow = {
-        per_subject: $('allow-per-subject').checked,
-        per_dept: $('allow-per-dept').checked,
-        all_subjects: $('allow-all').checked
+    if (!activeExam) return;
+    var prices = { per_subject: Number($('price-per-subject').value), per_dept: Number($('price-per-dept').value), all_subjects: Number($('price-all-subjects').value) };
+    var allow = { per_subject: $('allow-per-subject').checked, per_dept: $('allow-per-dept').checked, all_subjects: $('allow-all').checked };
+    
+    // ⚠️ SAVE TUTORIAL FIELDS
+    var tutorialData = {
+        tutorialPrice: Number($('tutorial-price').value),
+        tutorialLink: $('tutorial-link').value.trim(),
+        tutorialBenefits: $('tutorial-benefits').value.trim()
     };
 
     try {
-        var result = await api('/admin/exams', {
-            method: 'PUT',
-            body: { id: activeExam.id, prices: prices, allow: allow }
-        });
+        var result = await api('/admin/exams', { method: 'PUT', body: { id: activeExam.id, prices: prices, allow: allow, ...tutorialData } });
         activeExam = result.exam;
         alert('Prices Updated!');
-    } catch (err) {
-        alert('Failed to save: ' + err.message);
-    }
+    } catch (err) { alert('Failed to save: ' + err.message); }
 };
 
 async function uploadFileToR2(file) {
