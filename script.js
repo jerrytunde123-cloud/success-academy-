@@ -146,17 +146,57 @@ function renderExams() {
 function openTutorialsPage() {
     document.getElementById('tutorial-details').style.display = 'none';
     var grid = document.getElementById('tutorial-exam-grid');
+    grid.innerHTML = 'Loading...';
+
+    // Use dbExams if it's already loaded
+    if (dbExams && dbExams.length > 0) {
+        renderTutorialGrid();
+    } else {
+        // If not, fetch it again
+        fetch(API_URL + '/exams', { cache: 'no-store' })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                dbExams = Array.isArray(data) ? data : [];
+                renderTutorialGrid();
+            })
+            .catch(function() { grid.innerHTML = '<p style="color:red;">Failed to load exams.</p>'; });
+    }
+}
+
+function renderTutorialGrid() {
+    var grid = document.getElementById('tutorial-exam-grid');
     grid.innerHTML = '';
+    var hasTutorials = false;
+
     dbExams.forEach(function (exam) {
-        if (exam.tutorialPrice > 0) {
+        // Check if tutorialPrice is greater than 0
+        if (Number(exam.tutorialPrice) > 0) {
+            hasTutorials = true;
             var card = document.createElement('div');
             card.className = 'exam-card';
             card.onclick = function () { showTutorialDetails(exam); };
             var fallbackImg = 'https://placehold.co/60x60/001f5b/ffcc00?text=' + exam.name.substring(0, 2);
-            card.innerHTML = '<img src="' + (exam.logo || fallbackImg) + '" onerror="this.src=\'' + fallbackImg + '\'"><h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">' + exam.name + '</h3>';
+            
+            var img = document.createElement('img');
+            img.src = exam.logo || fallbackImg;
+            img.alt = exam.name;
+            img.onerror = function() { this.onerror = null; this.src = fallbackImg; };
+            
+            var title = document.createElement('h3');
+            title.style.marginTop = '10px';
+            title.style.color = 'var(--primary-blue)';
+            title.style.fontSize = '16px';
+            title.textContent = exam.name;
+            
+            card.appendChild(img);
+            card.appendChild(title);
             grid.appendChild(card);
         }
     });
+
+    if (!hasTutorials) {
+        grid.innerHTML = '<p style="text-align:center; color:#666; grid-column: 1 / -1;">No tutorials are currently available. Check back later!</p>';
+    }
 }
 
 function showTutorialDetails(exam) {
