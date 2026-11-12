@@ -35,7 +35,9 @@
 
         <section id="exams" class="exams-section">
             <h2 class="section-title">Select Exam to View Packages</h2>
-            <div class="exam-grid" id="home-exam-grid"></div>
+            <div class="exam-grid" id="home-exam-grid">
+                <!-- Tutorial Card will be added here dynamically -->
+            </div>
         </section>
 
         <section id="contact" class="contact-section">
@@ -54,7 +56,6 @@
                 <input type="tel" id="phone" placeholder="Your Phone Number" required>
                 <select id="exam-select-enquiry" required>
                     <option value="">Select Exam/Service</option>
-                    <!-- ⚠️ UPDATED: Complete list added -->
                     <option value="WAEC">WAEC</option>
                     <option value="WAEC GCE">WAEC GCE</option>
                     <option value="NECO">NECO</option>
@@ -77,6 +78,23 @@
         <div id="news-container"></div>
     </main>
 
+    <!-- NEW: Tutorials Selection Page -->
+    <main id="page-tutorials" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
+        <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
+        <h2 class="section-title">Select Exam for Tutorials</h2>
+        <div id="tutorial-exam-grid" class="exam-grid" style="margin-bottom: 30px;"></div>
+
+        <div id="tutorial-details" style="display: none; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <h3 id="tut-exam-name" style="color: var(--primary-blue); margin-bottom: 15px;"></h3>
+            <div id="tut-benefits" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; white-space: pre-wrap;"></div>
+            <div style="text-align: center;">
+                <h4 style="color: green; font-size: 24px;">₦<span id="tut-price"></span></h4>
+                <p style="font-size: 12px; color: #666; margin-bottom: 15px;">One-time payment for lifetime access</p>
+                <button class="btn-buy" onclick="payForTutorial()" style="width: 100%; max-width: 300px;">Pay & Join Class</button>
+            </div>
+        </div>
+    </main>
+
     <main id="page-packages" style="display: none; padding: 40px 5%;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
@@ -84,10 +102,7 @@
         </div>
         
         <h2 class="section-title" id="pkg-exam-title"></h2>
-        
-        <p id="exam-note" style="text-align: center; color: #d9534f; font-weight: bold; font-size: 15px; margin-top: -15px; margin-bottom: 30px; padding: 0 20px;">
-            All questions and answers drop a day before the exam. Subscribe now to secure your PIN!
-        </p>
+        <p id="exam-note" style="text-align: center; color: #d9534f; font-weight: bold; font-size: 15px; margin-top: -15px; margin-bottom: 30px; padding: 0 20px;"></p>
 
         <div class="packages-container">
             <div class="package-card" id="pkg-per-subject">
@@ -141,7 +156,7 @@
                 <img id="subject-preview-img" src="" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
             </div>
             <div id="subject-selection-area" style="display: none; margin: 15px 0;">
-                <p id="subject-instruction" style="font-size: 13px; color: #d9534f; font-weight: bold; margin-bottom: 10px; display: none;">Please select the 9 subjects for your department.</p>
+                <p id="subject-instruction" style="font-size: 13px; color: #d9534f; font-weight: bold; margin-bottom: 10px; display: none;"></p>
                 <div id="subject-checkboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;"></div>
             </div>
             <input hidden value="student@example.com" type="email"  id="checkout-email" placeholder="Your Email Address (for receipt)" required style="width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:5px; box-sizing:border-box;">
@@ -171,6 +186,6 @@
     </footer>
 
     <script async src="https://js.paystack.co/v2/inline.js"></script>
-    <script src="script.js?v=16"></script>
+    <script src="script.js?v=17"></script>
 </body>
 </html>
