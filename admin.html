@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Dashboard | Success Academy</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -46,10 +47,28 @@
         .table-wrap table { min-width: 700px; }
         @media (max-width: 700px) {
             body { padding: 10px; }
-            .container { padding: 16px; }
-            .stats-grid { grid-template-columns: 1fr; }
+            .container { width: 100%; padding: 16px; box-sizing: border-box; }
+            .login-box { width: 100%; max-width: 400px; margin: 40px auto; padding: 24px; box-sizing: border-box; }
+            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .stat-box { padding: 14px 8px; }
+            .stat-box h2 { font-size: 26px; }
             .header { align-items: center; gap: 10px; }
             .header h1 { font-size: 22px; }
+            .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+            .tab { padding: 10px 8px; }
+            .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+            .row > label { width: auto !important; }
+            .row > input:not([type="checkbox"]), .row > textarea, .row > select { width: 100%; min-width: 0; }
+            .upload-box { padding: 12px; }
+            .modal-content { width: auto; max-height: calc(100dvh - 32px); overflow-y: auto; }
+            .delete-modal-actions { flex-wrap: wrap; }
+        }
+        @media (max-width: 380px) {
+            body { padding: 8px; }
+            .container { padding: 12px; }
+            .login-box { padding: 20px; }
+            .header h1 { font-size: 19px; }
+            .tab { font-size: 13px; }
         }
     </style>
 </head>

@@ -258,7 +258,7 @@ function renderExams() {
     var tutCard = document.createElement('div');
     tutCard.className = 'exam-card';
     tutCard.onclick = function () { showPage('tutorials'); };
-    tutCard.innerHTML = '<img src="https://placehold.co/60x60/001f5b/ffcc00?text=TUT" alt="Tutorials"><h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">Tutorials & Classes</h3>';
+    tutCard.innerHTML = '<img src="/assets/tutor-logo.jpg" alt="Tutorials"><h3 style="margin-top:10px; color:var(--primary-blue); font-size:16px;">Tutorials & Classes</h3>';
     grid.appendChild(tutCard);
 }
 
