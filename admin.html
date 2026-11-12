@@ -77,6 +77,7 @@
 
         <div class="tabs">
             <button class="tab active" onclick="withButtonLoading(this, 'Loading...', () => switchTab('exams', event))">Manage Exams</button>
+            <button class="tab" onclick="withButtonLoading(this, 'Loading...', () => switchTab('tutorials', event))">Tutorials</button>
             <button class="tab" onclick="withButtonLoading(this, 'Loading...', () => switchTab('pins', event))">PIN History</button>
             <button class="tab" onclick="withButtonLoading(this, 'Loading...', () => switchTab('orders', event))">Orders</button>
             <button class="tab" onclick="withButtonLoading(this, 'Loading...', () => switchTab('news', event))">Manage News</button>
@@ -93,11 +94,6 @@
                 <div class="row"><label style="width:120px;">Per Subject (₦):</label> <input type="number" id="price-per-subject"> <label><input type="checkbox" id="allow-per-subject"> Enable</label></div>
                 <div class="row"><label style="width:120px;">Per Dept (₦):</label> <input type="number" id="price-per-dept"> <label><input type="checkbox" id="allow-per-dept"> Enable</label></div>
                 <div class="row"><label style="width:120px;">All Subjects (₦):</label> <input type="number" id="price-all-subjects"> <label><input type="checkbox" id="allow-all"> Enable</label></div>
-                <!-- NEW TUTORIAL FIELDS -->
-                <div class="row"><label style="width:120px;">Tutorial Price (₦):</label> <input type="number" id="tutorial-price" min="0" step="1"></div>
-                <div class="row"><label style="width:120px;">Tutorial Link:</label> <input type="url" id="tutorial-link" placeholder="https://chat.whatsapp.com/..."></div>
-                <div class="row"><label style="width:120px;">Tutorial Benefits:</label> <textarea id="tutorial-benefits" rows="3" maxlength="5000" placeholder="Write the benefits here..."></textarea></div>
-                <p style="font-size:12px; color:#666;">A secure HTTPS class link is required to publish a tutorial with a price.</p>
                 <button class="save-btn" onclick="withButtonLoading(this, 'Saving...', saveConfig)">Save Prices</button>
             </div>
 
@@ -127,6 +123,23 @@
                     <textarea id="content-input" rows="5" placeholder="Paste text answers here..."></textarea>
                     <button class="save-btn" onclick="withButtonLoading(this, 'Saving...', saveTextContent)">Save Text Content</button>
                 </div>
+            </div>
+        </div>
+
+        <div id="tab-tutorials" class="section">
+            <h3>Manage Tutorials</h3>
+            <p>Configure tutorial pricing, class links, and benefits separately from exam package prices.</p>
+            <label for="tutorial-exam-select">Select Exam:</label>
+            <select id="tutorial-exam-select" onchange="loadTutorialConfig()">
+                <option value="">-- Select Exam --</option>
+            </select>
+            <div class="section" id="tutorial-config-area" style="display:none; background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <h3>Tutorial for <span id="tutorial-config-name"></span></h3>
+                <div class="row"><label style="width:120px;">Price (₦):</label> <input type="number" id="tutorial-price" min="0" step="1"></div>
+                <div class="row"><label style="width:120px;">Class Link:</label> <input type="url" id="tutorial-link" placeholder="https://chat.whatsapp.com/..."></div>
+                <div class="row"><label style="width:120px;">Benefits:</label> <textarea id="tutorial-benefits" rows="3" maxlength="5000" placeholder="Write the benefits here..."></textarea></div>
+                <p style="font-size:12px; color:#666;">A secure HTTPS class link is required to publish a tutorial with a price.</p>
+                <button class="save-btn" onclick="withButtonLoading(this, 'Saving...', saveTutorialConfig)">Save Tutorial</button>
             </div>
         </div>
 

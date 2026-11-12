@@ -5,6 +5,7 @@ const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
 var exams = [];
 var activeExam = null;
+var activeTutorialExam = null;
 var activeSubject = null;
 var allNews = [];
 var allEnquiries = [];
@@ -182,6 +183,9 @@ async function initDashboard() {
     try {
         exams = await api('/admin/exams');
         exams.forEach(function (exam) { select.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>'; });
+        var tutorialSelect = $('tutorial-exam-select');
+        tutorialSelect.innerHTML = '<option value="">-- Select Exam --</option>';
+        exams.forEach(function (exam) { tutorialSelect.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>'; });
         var manualSelect = $('manual-exam-select');
         manualSelect.innerHTML = '';
         exams.forEach(function (exam) { manualSelect.innerHTML += '<option value="' + escapeHtml(exam.id) + '">' + escapeHtml(exam.name) + '</option>'; });
@@ -218,16 +222,35 @@ window.loadExamConfig = async function () {
     $('allow-per-dept').checked = activeExam.allow.per_dept;
     $('price-all-subjects').value = activeExam.prices.all_subjects;
     $('allow-all').checked = activeExam.allow.all_subjects;
-    
-    // ⚠️ LOAD TUTORIAL FIELDS
-    $('tutorial-price').value = activeExam.tutorialPrice || 0;
-    $('tutorial-link').value = activeExam.tutorialLink || '';
-    $('tutorial-benefits').value = activeExam.tutorialBenefits || '';
 
     var subSelect = $('subject-select');
     subSelect.innerHTML = '';
     activeExam.subjects.forEach(function (sub) { subSelect.innerHTML += '<option value="' + escapeHtml(sub.name) + '">' + escapeHtml(sub.name) + '</option>'; });
     if (activeExam.subjects.length > 0) {window.loadSubjectData();}
+};
+
+window.loadTutorialConfig = async function () {
+    var id = $('tutorial-exam-select').value;
+    if (!id) {
+        activeTutorialExam = null;
+        $('tutorial-config-area').style.display = 'none';
+        return;
+    }
+
+    try {
+        activeTutorialExam = await api('/admin/exams?id=' + encodeURIComponent(id));
+    } catch (err) {
+        activeTutorialExam = null;
+        $('tutorial-config-area').style.display = 'none';
+        alert(err.message);
+        return;
+    }
+
+    setText('tutorial-config-name', activeTutorialExam.name);
+    $('tutorial-price').value = activeTutorialExam.tutorialPrice || 0;
+    $('tutorial-link').value = activeTutorialExam.tutorialLink || '';
+    $('tutorial-benefits').value = activeTutorialExam.tutorialBenefits || '';
+    $('tutorial-config-area').style.display = 'block';
 };
 
 window.loadSubjectData = function () {
@@ -327,18 +350,28 @@ window.saveConfig = async function () {
     if (!activeExam) {return;}
     var prices = { per_subject: Number($('price-per-subject').value), per_dept: Number($('price-per-dept').value), all_subjects: Number($('price-all-subjects').value) };
     var allow = { per_subject: $('allow-per-subject').checked, per_dept: $('allow-per-dept').checked, all_subjects: $('allow-all').checked };
-    
+
+    try {
+        var result = await api('/admin/exams', { method: 'PUT', body: { id: activeExam.id, prices: prices, allow: allow } });
+        activeExam = result.exam;
+        alert('Prices Updated!');
+    } catch (err) { alert('Failed to save: ' + err.message); }
+};
+
+window.saveTutorialConfig = async function () {
+    if (!activeTutorialExam) {return;}
     var tutorialData = {
+        id: activeTutorialExam.id,
         tutorialPrice: Number($('tutorial-price').value),
         tutorialLink: $('tutorial-link').value.trim(),
         tutorialBenefits: $('tutorial-benefits').value.trim()
     };
 
     try {
-        var result = await api('/admin/exams', { method: 'PUT', body: { id: activeExam.id, prices: prices, allow: allow, ...tutorialData } });
-        activeExam = result.exam;
-        alert('Prices Updated!');
-    } catch (err) { alert('Failed to save: ' + err.message); }
+        var result = await api('/admin/exams', { method: 'PUT', body: tutorialData });
+        activeTutorialExam = result.exam;
+        alert('Tutorial updated!');
+    } catch (err) { alert('Failed to save tutorial: ' + err.message); }
 };
 
 async function uploadFileToR2(file) {

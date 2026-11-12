@@ -268,22 +268,16 @@ function openTutorialsPage() {
     var grid = document.getElementById('tutorial-exam-grid');
     grid.innerHTML = 'Loading...';
 
-    // Use dbExams if it's already loaded
-    if (dbExams && dbExams.length > 0) {
-        renderTutorialGrid();
-    } else {
-        // If not, fetch it again
-        fetch(API_URL + '/exams', { cache: 'no-store' })
-            .then(function (res) {
-                if (!res.ok) {throw new Error('Could not load exams.');}
-                return res.json();
-            })
-            .then(function(data) {
-                dbExams = Array.isArray(data) ? data : [];
-                renderTutorialGrid();
-            })
-            .catch(function() { grid.innerHTML = '<p style="color:red;">Failed to load tutorials. Please try again later.</p>'; });
-    }
+    fetch(API_URL + '/exams', { cache: 'no-store' })
+        .then(function (res) {
+            if (!res.ok) {throw new Error('Could not load exams.');}
+            return res.json();
+        })
+        .then(function(data) {
+            dbExams = Array.isArray(data) ? data : [];
+            renderTutorialGrid();
+        })
+        .catch(function() { grid.innerHTML = '<p style="color:red;">Failed to load tutorials. Please try again later.</p>'; });
 }
 
 function renderTutorialGrid() {
