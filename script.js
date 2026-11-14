@@ -84,6 +84,18 @@ function getDeviceId() {
     return deviceId;
 }
 
+function setVerifiedLocalStorage(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        if (localStorage.getItem(key) !== value) {
+            throw new Error('The saved value could not be confirmed.');
+        }
+    } catch (error) {
+        throw new Error('This browser could not save payment recovery data. Enable browser storage and try again. ' +
+            (error.message || ''));
+    }
+}
+
 function displayDeviceId() {
     var display = document.getElementById('user-device-id-display');
     if (display) {display.innerText = getDeviceId();}
@@ -99,14 +111,66 @@ async function copyDeviceId() {
 }
 
 function savePinLocally(pinData) {
-    try {
-        var history = JSON.parse(localStorage.getItem('sa_my_pins')) || [];
-        if (!history.some(function (p) { return p.pin === pinData.pin; })) {
-            history.push(pinData);
-            localStorage.setItem('sa_my_pins', JSON.stringify(history));
+    var stored = localStorage.getItem('sa_my_pins');
+    var history = stored ? JSON.parse(stored) : [];
+    if (!Array.isArray(history)) {
+        throw new Error('Saved PIN history is invalid. Your payment is verified, but the PIN could not be saved.');
+    }
+    if (!history.some(function (pin) { return pin.pin === pinData.pin; })) {
+        history.push(pinData);
+    }
+    var serialized = JSON.stringify(history);
+    localStorage.setItem('sa_my_pins', serialized);
+    if (localStorage.getItem('sa_my_pins') !== serialized) {
+        throw new Error('Your PIN could not be confirmed in this browser’s storage. Please retry from My PINs.');
+    }
+}
+
+function readPendingPayments() {
+    var pending = [];
+    var stored = localStorage.getItem('sa_pending_payments');
+    if (stored) {
+        pending = JSON.parse(stored);
+        if (!Array.isArray(pending)) {
+            throw new Error('Saved payment recovery details are invalid.');
         }
-    } catch (_err) {
-        // PIN history is optional when browser storage is unavailable.
+    }
+
+    var legacyStored = localStorage.getItem('sa_pending_payment');
+    if (legacyStored) {
+        var legacyPending = JSON.parse(legacyStored);
+        if (legacyPending && !pending.some(function (item) { return item.reference === legacyPending.reference; })) {
+            pending.push(legacyPending);
+        }
+    }
+    if (pending.some(function (item) {
+        return !item || typeof item.reference !== 'string' || !/^SA_[A-F0-9]{16,64}$/i.test(item.reference);
+    })) {
+        throw new Error('Saved payment recovery details are invalid.');
+    }
+    return pending;
+}
+
+function addPendingPayment(payment) {
+    var pending = readPendingPayments().filter(function (item) {
+        return item.reference !== payment.reference;
+    });
+    pending.push(payment);
+    setVerifiedLocalStorage('sa_pending_payments', JSON.stringify(pending));
+}
+
+function removePendingPayment(reference) {
+    var pending = readPendingPayments().filter(function (item) {
+        return item.reference !== reference;
+    });
+    if (pending.length) {
+        setVerifiedLocalStorage('sa_pending_payments', JSON.stringify(pending));
+    } else {
+        localStorage.removeItem('sa_pending_payments');
+    }
+    var legacyStored = localStorage.getItem('sa_pending_payment');
+    if (legacyStored && JSON.parse(legacyStored).reference === reference) {
+        localStorage.removeItem('sa_pending_payment');
     }
 }
 
@@ -115,9 +179,45 @@ function loadMyPinHistory() {
     if (!container) {return;}
     container.innerHTML = '';
     var history = [];
-    try { history = JSON.parse(localStorage.getItem('sa_my_pins')) || []; } catch (_err) { history = []; }
+    var pending = [];
+    try {
+        var stored = localStorage.getItem('sa_my_pins');
+        history = stored ? JSON.parse(stored) : [];
+        if (!Array.isArray(history)) {
+            throw new Error('Saved PIN history is invalid.');
+        }
+        pending = readPendingPayments();
+    } catch (error) {
+        container.innerHTML = '<p role="alert" style="color:#b42318; text-align:center;">Could not read saved PINs from this browser: ' +
+            escapeHtml(error.message || 'Storage is unavailable.') + '</p>';
+        return;
+    }
+    pending.forEach(function (payment) {
+        var recovery = document.createElement('div');
+        recovery.style.cssText = 'background:#fff4e5;border:1px solid #f0ad4e;padding:15px;margin-bottom:15px;border-radius:8px;';
+        var recoveryText = document.createElement('p');
+        recoveryText.textContent = 'Payment ' + payment.reference + ' may need PIN confirmation. Retry safely; completed payments return the same PIN.';
+        var recoveryButton = document.createElement('button');
+        recoveryButton.type = 'button';
+        recoveryButton.className = 'btn-buy';
+        recoveryButton.textContent = 'Recover PIN';
+        recoveryButton.onclick = function () {
+            withButtonLoading(recoveryButton, 'Checking payment...', function () {
+                return claimPayment(payment.reference, 0).then(loadMyPinHistory);
+            });
+        };
+        recovery.appendChild(recoveryText);
+        recovery.appendChild(recoveryButton);
+        container.appendChild(recovery);
+    });
     if (history.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:#666;">You have not purchased any PINs on this device yet.</p>';
+        var empty = document.createElement('p');
+        empty.style.textAlign = 'center';
+        empty.style.color = '#666';
+        empty.textContent = pending.length
+            ? 'Your PIN will appear here after payment is confirmed.'
+            : 'You have not purchased any PINs on this device yet.';
+        container.appendChild(empty);
         return;
     }
     history.slice().reverse().forEach(function (item) {
@@ -579,6 +679,13 @@ function payWithPaystack() {
     var subjects = currentPackageType === 'all_subjects' ? currentExam.subjects.map(function (s) { return s.name; }) : selectedSubjects;
     var payButton = document.querySelector('.btn-paystack');
     var originalText = payButton ? payButton.innerText : 'Pay with Paystack';
+    var deviceId = getDeviceId();
+    try {
+        setVerifiedLocalStorage('sa_device_id', deviceId);
+    } catch (error) {
+        alert(error.message || 'Enable browser storage before starting checkout.');
+        return;
+    }
     if (payButton) {
         payButton.disabled = true;
         payButton.setAttribute('aria-busy', 'true');
@@ -591,15 +698,22 @@ function payWithPaystack() {
         });
         return;
     }
-    Promise.all([ getPaystackPublicKey(), fetch(API_URL + '/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ examId: currentExam.id, packageType: currentPackageType, subjects: subjects, email: email, deviceId: getDeviceId() }) }).then(function (response) { return response.json().catch(function () { return {}; }).then(function (data) { if (!response.ok) {throw new Error(data.error || 'Checkout failed.');} return data; }); }) ])
+    Promise.all([ getPaystackPublicKey(), fetch(API_URL + '/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ examId: currentExam.id, packageType: currentPackageType, subjects: subjects, email: email, deviceId: deviceId }) }).then(function (response) { return response.json().catch(function () { return {}; }).then(function (data) { if (!response.ok) {throw new Error(data.error || 'Checkout failed.');} return data; }); }) ])
         .then(function (results) {
             var publicKey = results[0]; var data = results[1];
             try {
                 localStorage.setItem('sa_email', email);
-                localStorage.setItem('sa_pending_payment', JSON.stringify({ reference: data.reference, examId: currentExam.id, examName: currentExam.name, packageType: currentPackageType, subjects: subjects, date: new Date().toISOString() }));
-            } catch (_err) {
-                // Payment can continue without local recovery details.
+            } catch (error) {
+                console.warn('Could not remember checkout email:', error.message);
             }
+            addPendingPayment({
+                reference: data.reference,
+                examId: currentExam.id,
+                examName: currentExam.name,
+                packageType: currentPackageType,
+                subjects: subjects,
+                date: new Date().toISOString()
+            });
             closeModal('checkout-modal');
             var amountKobo = Math.round(Number(data.amount || currentPrice) * 100);
             var popup = new PaystackPop();
@@ -628,19 +742,21 @@ function payWithPaystack() {
 
 function claimPayment(reference, attempt) {
     var tries = typeof attempt === 'number' ? attempt : 0;
+    reference = String(reference || '').trim().toUpperCase();
     return fetch(API_URL + '/pins/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: reference, deviceId: getDeviceId() }) })
         .then(function (response) { return response.json().catch(function () { return {}; }).then(function (data) { if (!response.ok) { var error = new Error(data.error || 'Could not verify payment.'); error.status = response.status; throw error; } return data; }); })
         .then(function (data) {
             savePinLocally({ pin: data.pin, examId: data.examId, examName: data.examName, subjects: data.subjects, date: data.date, reference: data.reference });
             try {
-                localStorage.removeItem('sa_pending_payment');
-            } catch (_err) {
-                // The verified PIN is already saved when storage is available.
+                removePendingPayment(reference);
+            } catch (error) {
+                console.warn('Could not clear the recovered payment reference:', error.message);
             }
+            clearReturnedPayment(reference);
             showSuccessPin(data);
             return data;
         })
-        .catch(function (error) { if (error.status === 402 && tries < 3) { return new Promise(function (resolve) { setTimeout(resolve, 2500); }).then(function () { return claimPayment(reference, tries + 1); }); } alert(error.message || 'Could not verify payment.'); });
+        .catch(function (error) { if (error.status === 402 && tries < 3) { return new Promise(function (resolve) { setTimeout(resolve, 2500); }).then(function () { return claimPayment(reference, tries + 1); }); } alert(error.message || 'Could not verify payment. Your recovery details are still available under My PINs.'); });
 }
 
 function showSuccessPin(data) {
@@ -658,13 +774,19 @@ function handleReturnedPayment() {
         verifyTutorialPayment(null, reference);
         return;
     }
+    if (!/^SA_[A-F0-9]{16,64}$/i.test(reference)) { alert('Invalid payment reference.'); return; }
+    claimPayment(reference, 0);
+}
+
+function clearReturnedPayment(reference) {
+    var params = new URLSearchParams(window.location.search);
+    var returnedReference = params.get('reference') || params.get('trxref');
+    if (returnedReference !== reference) {return;}
     try {
         window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
     } catch (_err) {
-        // Payment verification does not depend on clearing the URL.
+        // The saved PIN and pending reference remain available if URL cleanup fails.
     }
-    if (!/^SA_[A-F0-9]{16,64}$/i.test(reference)) { alert('Invalid payment reference.'); return; }
-    claimPayment(reference, 0);
 }
 
 function verifyAndShowContent() {
