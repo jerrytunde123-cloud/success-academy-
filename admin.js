@@ -1011,6 +1011,19 @@ window.closeModal = function () {
     $('reply-modal').style.display = 'none';
 };
 
+function buildReplyEmailHtml(name, message) {
+    var greeting = String(name || '').trim();
+    return [
+        '<div style="font-family:Arial,Helvetica,sans-serif;color:#222;line-height:1.5;">',
+        '<h2 style="color:#001f5b;margin:0 0 12px;">Success Academy</h2>',
+        '<p style="margin:0 0 12px;">Hello' + (greeting ? ' ' + escapeHtml(greeting) : '') + ',</p>',
+        '<div style="padding:14px;border:1px solid #ddd;border-radius:6px;background:#f8f9fa;">' +
+            escapeHtml(message).replace(/\r?\n/g, '<br>') + '</div>',
+        '<p style="margin:12px 0 0;color:#666;font-size:12px;">If you did not contact us, you can ignore this message.</p>',
+        '</div>'
+    ].join('');
+}
+
 window.sendEmailReply = async function () {
     if (!currentReplyData) {
         return;
@@ -1042,9 +1055,8 @@ window.sendEmailReply = async function () {
             emailjsConfig.serviceId,
             emailjsConfig.templateId,
             {
-                to_name: currentReplyData.name || '',
                 to_email: currentReplyData.email || '',
-                reply_message: message
+                html: buildReplyEmailHtml(currentReplyData.name, message)
             },
             {
                 publicKey: emailjsConfig.publicKey,

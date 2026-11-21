@@ -45,8 +45,8 @@ success-academy/
 5. The admin dashboard uses a signed, HttpOnly session cookie. Image uploads are posted to the API (max **4 MB** per image) and forwarded to R2 from the server, so the bucket needs **no CORS policy**.
 6. `GET /api/config` returns the Paystack public key (safe to expose) and whether payments are enabled. The key comes from `PAYSTACK_PUBLIC_KEY`, falling back to the built-in key in `lib/paystack.js`.
 7. Tutorial enrollment is configured per exam in the admin dashboard. A priced tutorial must have a secure HTTPS class link to be listed publicly. `POST /api/tutorials` creates a pending order with a snapshot of the class link and initializes Paystack; after checkout, the server verifies the stored reference, amount, and currency before returning that link, even if the admin later changes the listing. The same verification works when Paystack returns the browser to the site.
-8. Admin enquiry replies are sent from the admin browser with the **EmailJS** SDK, using the public key/service/template IDs returned by `GET /api/admin/emailjs` (admin-only, env-driven). Once EmailJS confirms delivery, the browser calls `POST /api/admin/enquiries` with `recordOnly: true` so the server records `repliedAt`. The backend never holds an EmailJS private key or sends the reply itself.
-9. Result PINs are a separate product: admin buys WAEC/NECO credentials and adds them to stock; buyers pay through Paystack using `POST /api/result-pins/checkout`. The server reserves one PIN, verifies the transaction in `POST /api/result-pins/claim`, and returns the credential plus a download token. `/result-pins` shows the PIN, offers a PDF voucher, and sends a receipt through EmailJS from the buyer's browser. The PDF itself is generated on the server only after a verified claim; the server never sends email.
+8. Admin enquiry replies are sent from the admin browser with the **EmailJS** SDK, using the public key/service/template IDs returned by `GET /api/admin/emailjs` (admin-only, env-driven). The browser sends `to_email` and a raw HTML body in `{{{html}}}`. Once EmailJS confirms delivery, the browser calls `POST /api/admin/enquiries` with `recordOnly: true` so the server records `repliedAt`. The backend never holds an EmailJS private key or sends the reply itself.
+9. Result PINs are a separate product: admin buys WAEC/NECO credentials and adds them to stock; buyers pay through Paystack using `POST /api/result-pins/checkout`. The server reserves one PIN, verifies the transaction in `POST /api/result-pins/claim`, and returns the credential plus a download token. `/result-pins` shows the PIN, offers a PDF voucher, and sends a receipt through EmailJS from the buyer's browser using the **same template** as admin replies. The PDF itself is generated on the server only after a verified claim; the server never sends email.
 
 ## Environment variables
 
@@ -68,14 +68,13 @@ Copy `.env.example` to `.env` (or `.env.local` for machine-only test keys) for l
 | `R2_SECRET_ACCESS_KEY` | Yes for uploads | R2 API token secret |
 | `R2_BUCKET_NAME` | Yes for uploads | Bucket name |
 | `R2_PUBLIC_URL` | Yes for uploads | Public bucket URL (`https://pub-….r2.dev` or a custom domain) |
-| `EMAILJS_PUBLIC_KEY` | Optional | Enables email replies from the admin dashboard; EmailJS account public key |
-| `EMAILJS_SERVICE_ID` | Optional | EmailJS service ID used for replies |
-| `EMAILJS_TEMPLATE_ID` | Optional | EmailJS template ID; must define `{{to_name}}`, `{{to_email}}`, `{{reply_message}}` |
-| `EMAILJS_RESULT_TEMPLATE_ID` | Optional | EmailJS receipt template for result PIN buyers; uses the same public key/service above |
+| `EMAILJS_PUBLIC_KEY` | Optional | EmailJS account public key; enables email for replies and receipts |
+| `EMAILJS_SERVICE_ID` | Optional | EmailJS service ID used everywhere |
+| `EMAILJS_TEMPLATE_ID` | Optional | One shared EmailJS template ID; must define `{{to_email}}` and `{{{html}}}` |
 
-All three reply variables must be set to enable the **Email** reply button. The fourth variable enables automatic buyer receipts. EmailJS public keys and IDs are designed to be public, but they are stored in env vars: reply IDs only go to signed-in admins via `/api/admin/emailjs`, and the receipt template ID goes to everyone via `/api/result-pins/emailjs`. Nothing is hardcoded in the frontend.
+All three variables must be set to enable the **Email** reply button and automatic buyer receipts. One template is reused for both, with `{{to_email}}` as the recipient and `{{{html}}}` as the full message body. EmailJS public keys and IDs are designed to be public, but they are stored in env vars and served by `/api/admin/emailjs` and `/api/result-pins/emailjs`. Nothing is hardcoded in the frontend.
 
-The receipt template only needs `{{to_email}}` and `{{{html}}}`. The browser builds the full HTML body and escapes its values, so use triple braces for `html`; double braces would show the markup as text.
+The browser builds the HTML body and escapes every dynamic value before sending it, so use triple braces for `html`; double braces would show the markup as text.
 
 ## Turso setup
 
@@ -203,9 +202,9 @@ Uploads need R2 configured. Images must be smaller than **4 MB**; the dashboard 
 | Payment succeeds but no PIN | The claim call failed. Use the same browser/device that started checkout, or check the pending order/PIN in `/admin`. |
 | Admin session drops immediately | Ensure `ADMIN_SESSION_SECRET` is stable across deployments; changing it invalidates existing cookies. |
 | Reply modal says `Email replies are not configured` | Set all three `EMAILJS_*` variables and redeploy; then sign out/in so `/api/admin/emailjs` is refetched. Use WhatsApp meanwhile. |
-| EmailJS error after clicking Send Email | Check the EmailJS service/template IDs and that the template uses `to_name`, `to_email`, `reply_message`. The CDN script must also be allowed by the CSP in `vercel.json`. |
-| Result PIN page says `not configured` or `out of stock` | Add stock under `/admin` → **Result PINs**, and set `EMAILJS_RESULT_TEMPLATE_ID` for receipts. |
-| Result email says `not configured` | Set `EMAILJS_RESULT_TEMPLATE_ID` in Vercel (Production/Preview/Development) and redeploy; the receipt uses the same public key and service as admin replies. |
+| EmailJS error after clicking Send Email | Check the EmailJS service/template IDs and that the shared template uses `{{to_email}}` and `{{{html}}}`. The CDN script must also be allowed by the CSP in `vercel.json`. |
+| Result PIN page says `not configured` or `out of stock` | Add stock under `/admin` → **Result PINs**, and set the three `EMAILJS_*` variables for receipts. |
+| Result email says `not configured` | Set the same three `EMAILJS_*` variables used by admin replies in Vercel (Production/Preview/Development) and redeploy. |
 | Voucher link is invalid | Download from the purchase confirmation page. The link includes a one-time token tied to that paid order. |
 
 ## Removed old architecture
@@ -214,5 +213,5 @@ Uploads need R2 configured. Images must be smaller than **4 MB**; the dashboard 
 - No `multer` uploads through the API.
 - No hardcoded admin password in `admin.html`.
 - No hardcoded Paystack public key in the frontend; the fallback lives server-side and is served by `/api/config`.
-- No hardcoded EmailJS keys in the frontend; reply IDs are env vars served only to admins by `/api/admin/emailjs`, and the receipt template ID by `/api/result-pins/emailjs`.
+- No hardcoded EmailJS keys in the frontend; the shared public IDs are env vars served by `/api/admin/emailjs` and `/api/result-pins/emailjs`.
 - No `API_URL` pointing at `onrender.com`.

@@ -19,7 +19,6 @@ process.env.R2_PUBLIC_URL = 'https://cdn.example.com';
 process.env.EMAILJS_PUBLIC_KEY = 'test-emailjs-public-key';
 process.env.EMAILJS_SERVICE_ID = 'service_test';
 process.env.EMAILJS_TEMPLATE_ID = 'template_test';
-process.env.EMAILJS_RESULT_TEMPLATE_ID = 'template_result_test';
 
 const db = require('../lib/db');
 const { ensureSchema, __resetSchemaForTests } = require('../lib/schema');
@@ -932,7 +931,7 @@ test('result checker PIN stock, checkout, claim and voucher work end to end', as
         const config = await call(resultEmailjsApi, { url: '/api/result-pins/emailjs' });
         assert.equal(config.statusCode, 200);
         assert.equal(config.body.enabled, true);
-        assert.equal(config.body.templateId, 'template_result_test');
+        assert.equal(config.body.templateId, 'template_test');
         assert.equal(Object.prototype.hasOwnProperty.call(config.body, 'privateKey'), false);
 
         const recorded = await call(resultEmailedApi, postOptions({
