@@ -75,7 +75,7 @@ Copy `.env.example` to `.env` (or `.env.local` for machine-only test keys) for l
 
 All three reply variables must be set to enable the **Email** reply button. The fourth variable enables automatic buyer receipts. EmailJS public keys and IDs are designed to be public, but they are stored in env vars: reply IDs only go to signed-in admins via `/api/admin/emailjs`, and the receipt template ID goes to everyone via `/api/result-pins/emailjs`. Nothing is hardcoded in the frontend.
 
-The receipt template should define `{{to_email}}`, `{{to_name}}`, `{{product_name}}`, `{{pin}}`, `{{serial}}`, `{{portal_url}}`, `{{instructions}}`, `{{reference}}`, `{{download_url}}`, `{{purchase_date}}`, and `{{amount}}`.
+The receipt template only needs `{{to_email}}` and `{{{html}}}`. The browser builds the full HTML body and escapes its values, so use triple braces for `html`; double braces would show the markup as text.
 
 ## Turso setup
 

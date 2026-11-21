@@ -896,6 +896,32 @@ function resultVoucherUrl(data) {
         '&token=' + encodeURIComponent(data.claimToken || '');
 }
 
+// The receipt template uses {{{html}}}, so EmailJS inserts this body as raw
+// HTML. Every dynamic value is escaped here before it reaches the template.
+function buildResultEmailHtml(data) {
+    var label = data.serial ? 'PIN and serial' : 'token';
+    var portalUrl = /^https?:\/\//i.test(String(data.portalUrl || '')) ? String(data.portalUrl) : '';
+    var downloadUrl = window.location.origin + resultVoucherUrl(data);
+    var amount = 'NGN ' + Number(data.amount || 0).toLocaleString();
+
+    return [
+        '<div style="font-family:Arial,Helvetica,sans-serif;color:#222;line-height:1.5;">',
+        '<h2 style="color:#001f5b;margin:0 0 12px;">Success Academy</h2>',
+        '<p style="margin:0 0 12px;">Your ' + escapeHtml(label) + ' is below.</p>',
+        '<div style="padding:14px;border:1px solid #ddd;border-radius:6px;background:#f8f9fa;margin-bottom:12px;">',
+        '<div style="font-size:12px;color:#666;">' + escapeHtml(label.toUpperCase()) + '</div>',
+        '<div style="font-size:20px;font-weight:bold;letter-spacing:2px;color:#001f5b;word-break:break-all;">' + escapeHtml(data.pin || '') + '</div>',
+        data.serial ? '<div style="margin-top:6px;">Serial: <strong>' + escapeHtml(data.serial) + '</strong></div>' : '',
+        '</div>',
+        '<p style="margin:0 0 6px;">Reference: ' + escapeHtml(data.reference || '') + '</p>',
+        '<p style="margin:0 0 6px;">Amount: ' + escapeHtml(amount) + '</p>',
+        '<p style="margin:0 0 12px;"><a href="' + escapeHtml(downloadUrl) + '">Download voucher</a></p>',
+        portalUrl ? '<p style="margin:0 0 12px;"><a href="' + escapeHtml(portalUrl) + '">Check your result</a></p>' : '',
+        '<p style="margin:0;color:#666;font-size:12px;">Keep this email safe. One ' + escapeHtml(label) + ' is for one candidate.</p>',
+        '</div>'
+    ].join('');
+}
+
 function renderResultProducts(products) {
     var grid = document.getElementById('result-product-grid');
     if (!grid) {return;}
@@ -1133,17 +1159,8 @@ async function sendResultEmail(data) {
             config.serviceId,
             config.templateId,
             {
-                to_name: 'Student',
                 to_email: data.email || '',
-                product_name: data.productName || '',
-                pin: data.pin || '',
-                serial: data.serial || '',
-                portal_url: data.portalUrl || '',
-                instructions: data.instructions || '',
-                reference: data.reference || '',
-                download_url: window.location.origin + resultVoucherUrl(data),
-                purchase_date: data.date || '',
-                amount: 'NGN ' + Number(data.amount || 0).toLocaleString()
+                html: buildResultEmailHtml(data)
             },
             {
                 publicKey: config.publicKey,
