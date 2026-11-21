@@ -17,7 +17,7 @@ success-academy/
 │   │   ├── claim.js     POST /api/pins/claim
 │   │   └── verify.js    POST /api/pins/verify
 │   └── admin/           Cookie-protected admin endpoints
-├── lib/                 Shared server modules (DB, auth, Paystack, R2, …)
+├── lib/                 Shared server modules (DB, auth, Paystack, R2, EmailJS config, …)
 ├── test/                node:test suite (in-memory SQLite, mocked Paystack)
 ├── assets/              Logos used by the admin/uploads (root PNGs are used by the UI)
 ├── index.html           Public site (original UI)
@@ -38,6 +38,7 @@ success-academy/
 5. The admin dashboard uses a signed, HttpOnly session cookie. Image uploads are posted to the API (max **4 MB** per image) and forwarded to R2 from the server, so the bucket needs **no CORS policy**.
 6. `GET /api/config` returns the Paystack public key (safe to expose) and whether payments are enabled. The key comes from `PAYSTACK_PUBLIC_KEY`, falling back to the built-in key in `lib/paystack.js`.
 7. Tutorial enrollment is configured per exam in the admin dashboard. A priced tutorial must have a secure HTTPS class link to be listed publicly. `POST /api/tutorials` creates a pending order with a snapshot of the class link and initializes Paystack; after checkout, the server verifies the stored reference, amount, and currency before returning that link, even if the admin later changes the listing. The same verification works when Paystack returns the browser to the site.
+8. Admin enquiry replies are sent from the admin browser with the **EmailJS** SDK, using the public key/service/template IDs returned by `GET /api/admin/emailjs` (admin-only, env-driven). Once EmailJS confirms delivery, the browser calls `POST /api/admin/enquiries` with `recordOnly: true` so the server records `repliedAt`. The backend never holds an EmailJS private key or sends the reply itself.
 
 ## Environment variables
 
@@ -59,10 +60,11 @@ Copy `.env.example` to `.env` (or `.env.local` for machine-only test keys) for l
 | `R2_SECRET_ACCESS_KEY` | Yes for uploads | R2 API token secret |
 | `R2_BUCKET_NAME` | Yes for uploads | Bucket name |
 | `R2_PUBLIC_URL` | Yes for uploads | Public bucket URL (`https://pub-….r2.dev` or a custom domain) |
-| `RESEND_API_KEY` | Optional | Enables email replies from the admin dashboard |
-| `EMAIL_FROM` | Optional | Verified Resend sender, e.g. `Success Academy <support@yourdomain.com>` |
+| `EMAILJS_PUBLIC_KEY` | Optional | Enables email replies from the admin dashboard; EmailJS account public key |
+| `EMAILJS_SERVICE_ID` | Optional | EmailJS service ID used for replies |
+| `EMAILJS_TEMPLATE_ID` | Optional | EmailJS template ID; must define `{{to_name}}`, `{{to_email}}`, `{{reply_message}}` |
 
-The admin UI will still work without Resend; use the WhatsApp button beside each enquiry instead.
+All three EmailJS variables must be set to enable the **Email** reply button. The admin UI still works without them; use the WhatsApp button beside each enquiry instead. EmailJS public keys and IDs are designed to be public, but they are stored in env vars and only served to signed-in admins — never hardcoded in `admin.html` or `admin.js`.
 
 ## Turso setup
 
@@ -158,7 +160,7 @@ Open `/admin` and log in with `ADMIN_PASSWORD`.
 - **PIN History** — see every PIN (paid and pending), create manual PINs for a device ID, and permanently delete PINs. Deleting a PIN revokes access but keeps any related order history.
 - **Orders** — review payment records. Pending orders cannot be deleted while payment may still complete. Deleting a paid order also deletes its linked PIN and revokes access.
 - **Manage News** — publish/edit/delete updates and upload up to 5 images.
-- **Enquiries** — read, delete, and reply to messages by email (if Resend is configured) or WhatsApp.
+- **Enquiries** — read, delete, and reply to messages by EmailJS (if configured) or WhatsApp. The reply is marked **(replied)** only after EmailJS confirms it was sent.
 
 All admin deletions require confirmation and are permanent. Removed R2 images are deleted from storage only when no exam or news content still references them.
 
@@ -170,6 +172,7 @@ Uploads need R2 configured. Images must be smaller than **4 MB**; the dashboard 
 - PINs are device-bound. Public exam responses never contain answer content or `qaImages`.
 - Admin sessions are HMAC-signed, `HttpOnly`, `SameSite=Strict` cookies; the admin password is compared in constant time. Admin writes also enforce same-origin requests.
 - Login, checkout, claim, verify, enquiry, visitor, and upload endpoints are rate-limited in the database.
+- EmailJS runs in the admin browser with the public key only; the SDK throttles sends to one per second, no private key is used, and the config endpoint requires an admin session. The server only records the reply after EmailJS succeeds.
 - All user/admin-supplied text is escaped before being rendered in the dashboards.
 - `.env` and `.env.local` are ignored by git and excluded from Vercel uploads via `.vercelignore`.
 
@@ -185,6 +188,8 @@ Uploads need R2 configured. Images must be smaller than **4 MB**; the dashboard 
 | R2 upload URL is created but image URL 404s | Public access is disabled on the bucket, or `R2_PUBLIC_URL` is wrong. |
 | Payment succeeds but no PIN | The claim call failed. Use the same browser/device that started checkout, or check the pending order/PIN in `/admin`. |
 | Admin session drops immediately | Ensure `ADMIN_SESSION_SECRET` is stable across deployments; changing it invalidates existing cookies. |
+| Reply modal says `Email replies are not configured` | Set all three `EMAILJS_*` variables and redeploy; then sign out/in so `/api/admin/emailjs` is refetched. Use WhatsApp meanwhile. |
+| EmailJS error after clicking Send Email | Check the EmailJS service/template IDs and that the template uses `to_name`, `to_email`, `reply_message`. The CDN script must also be allowed by the CSP in `vercel.json`. |
 
 ## Removed old architecture
 
@@ -192,4 +197,5 @@ Uploads need R2 configured. Images must be smaller than **4 MB**; the dashboard 
 - No `multer` uploads through the API.
 - No hardcoded admin password in `admin.html`.
 - No hardcoded Paystack public key in the frontend; the fallback lives server-side and is served by `/api/config`.
+- No hardcoded EmailJS keys in the frontend; they are env vars served only to admins by `/api/admin/emailjs`.
 - No `API_URL` pointing at `onrender.com`.

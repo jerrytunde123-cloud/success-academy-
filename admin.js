@@ -10,6 +10,7 @@ var activeSubject = null;
 var allNews = [];
 var allEnquiries = [];
 var currentReplyData = null;
+var emailjsConfig = null;
 var editingNewsImages = [];
 var currentDeleteResolve = null;
 var currentDeleteRequiresPhrase = false;
@@ -111,6 +112,26 @@ async function api(path, options) {
     return data;
 }
 
+async function loadEmailJSConfig() {
+    emailjsConfig = null;
+    try {
+        var config = await api('/admin/emailjs');
+        if (!config.enabled || !config.publicKey || !config.serviceId || !config.templateId) {
+            return;
+        }
+        emailjsConfig = config;
+        if (window.emailjs && typeof window.emailjs.init === 'function') {
+            window.emailjs.init({
+                publicKey: config.publicKey,
+                // EmailJS allows one request per second; stay inside that limit.
+                limitRate: { id: 'sa-admin-reply', throttle: 1000 }
+            });
+        }
+    } catch (_err) {
+        emailjsConfig = null;
+    }
+}
+
 function showLoginScreen() {
     $('login-screen').style.display = 'block';
     $('dashboard').style.display = 'none';
@@ -176,6 +197,7 @@ window.switchTab = async function (tabId, event) {
 };
 
 async function initDashboard() {
+    await loadEmailJSConfig();
     await initDashboardStats();
 
     var select = $('exam-select');
@@ -848,7 +870,9 @@ window.openReply = function (id) {
     currentReplyData = enquiry;
     setText('reply-name', enquiry.name);
     $('reply-message').value = '';
-    $('email-status').innerText = '';
+    var status = $('email-status');
+    status.style.color = emailjsConfig ? 'green' : 'red';
+    status.innerText = emailjsConfig ? '' : 'Email replies are not configured. Use WhatsApp instead.';
     $('reply-modal').style.display = 'flex';
 };
 
@@ -866,25 +890,59 @@ window.sendEmailReply = async function () {
     if (!message) {
         return alert('Type a message');
     }
+    if (!emailjsConfig) {
+        status.style.color = 'red';
+        status.innerText = 'Email replies are not configured. Use WhatsApp instead.';
+        return;
+    }
+    if (!window.emailjs || typeof window.emailjs.send !== 'function') {
+        status.style.color = 'red';
+        status.innerText = 'EmailJS could not load. Check your connection or use WhatsApp.';
+        return;
+    }
 
-    status.innerText = 'Sending...';
     status.style.color = 'blue';
+    status.innerText = 'Sending...';
+
+    // The SDK runs in the browser; the backend never sees the EmailJS keys
+    // used for sending and only records the outcome afterwards.
+    try {
+        await window.emailjs.send(
+            emailjsConfig.serviceId,
+            emailjsConfig.templateId,
+            {
+                to_name: currentReplyData.name || '',
+                to_email: currentReplyData.email || '',
+                reply_message: message
+            },
+            {
+                publicKey: emailjsConfig.publicKey,
+                limitRate: { id: 'sa-admin-reply', throttle: 1000 }
+            }
+        );
+    } catch (err) {
+        status.style.color = 'red';
+        status.innerText = String((err && (err.text || err.message)) || 'Failed to send email. Use WhatsApp instead.');
+        return;
+    }
 
     try {
         await api('/admin/enquiries', {
             method: 'POST',
-            body: { id: currentReplyData.id, message: message }
+            body: { id: currentReplyData.id, message: message, recordOnly: true }
         });
-        status.style.color = 'green';
-        status.innerText = 'Email Sent Successfully!';
-        setTimeout(function () {
-            window.closeModal();
-            loadEnquiries();
-        }, 1500);
     } catch (err) {
         status.style.color = 'red';
-        status.innerText = err.message || 'Failed to send email. Use WhatsApp instead.';
+        status.innerText = 'Email sent, but the reply status could not be saved: ' + err.message;
+        return;
     }
+
+    status.style.color = 'green';
+    status.innerText = 'Email Sent Successfully!';
+    setTimeout(function () {
+        window.closeModal();
+        loadEnquiries();
+    }, 1500);
 };
 
 $('admin-password').addEventListener('keydown', function (event) {

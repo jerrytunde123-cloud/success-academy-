@@ -15,6 +15,44 @@ const FALLBACK_PAYSTACK_PUBLIC_KEY = 'pk_live_456f9eef46c22ffa9c1f16d000f008926c
 const PLACEHOLDER_SELECT = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
 const PLACEHOLDER_NO_IMAGE = 'https://placehold.co/300x150/001f5b/ffffff?text=No+Photo+Yet';
 
+// Every section has a real URL so links can be bookmarked and shared.
+// Vercel rewrites these paths to index.html (see vercel.json).
+const PAGE_ROUTES = {
+    home: '/',
+    updates: '/updates',
+    tutorials: '/tutorials',
+    packages: '/packages',
+    history: '/my-pins',
+    verify: '/view-content'
+};
+const ROUTE_PAGES = {
+    '/': 'home',
+    '/updates': 'updates',
+    '/tutorials': 'tutorials',
+    '/packages': 'packages',
+    '/my-pins': 'history',
+    '/view-content': 'verify'
+};
+
+function currentPath() {
+    return window.location.pathname.replace(/\/+$/, '') || '/';
+}
+
+function pageForCurrentPath() {
+    return ROUTE_PAGES[currentPath()] || 'home';
+}
+
+// Accepts both the new ?news=<id> share links and the old /#news-<id> links
+// produced by the admin dashboard's Copy Link button.
+function getSharedNewsId() {
+    var raw = new URLSearchParams(window.location.search).get('news');
+    if (!raw && window.location.hash.indexOf('#news-') === 0) {
+        raw = window.location.hash.replace('#news-', '');
+    }
+    var id = parseInt(raw, 10);
+    return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 async function withButtonLoading(button, loadingText, action) {
     if (!button || button.disabled) {
         return;
@@ -252,10 +290,7 @@ function fetchNews() {
     if (!container) {return;}
     container.innerHTML = 'Loading updates...';
 
-    var hash = window.location.hash;
-    var targetNewsId = hash && hash.indexOf('#news-') === 0
-        ? parseInt(hash.replace('#news-', ''), 10)
-        : null;
+    var targetNewsId = getSharedNewsId();
 
     fetch(API_URL + '/news', { cache: 'no-store' })
         .then(function (response) {
@@ -289,7 +324,10 @@ function fetchNews() {
                 container.innerHTML +=
                     '<div id="news-' + Number(item.id) + '" style="background:white; padding:20px; border-radius:10px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05); border-left:5px solid var(--accent-yellow);">' +
                         '<h3 style="color:var(--primary-blue); margin-bottom:5px;">' + escapeHtml(item.title) + '</h3>' +
-                        '<p style="font-size:12px; color:#888; margin-bottom:15px;">' + escapeHtml(date) + '</p>' +
+                        '<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:15px;">' +
+                            '<p style="font-size:12px; color:#888; margin:0;">' + escapeHtml(date) + '</p>' +
+                            '<button type="button" class="btn-buy" onclick="withButtonLoading(this, \'Copying...\', () => copyNewsShareLink(' + Number(item.id) + '))" style="width:auto; padding:6px 10px; background:#0088cc; font-size:12px;"><i class="fas fa-link"></i> Copy Share Link</button>' +
+                        '</div>' +
                         '<div id="short-' + Number(item.id) + '" style="display:' + (isTarget ? 'none' : 'block') + ';">' +
                             '<p style="white-space:pre-wrap; color:#333; line-height:1.6;">' + shortContent + '</p>' +
                             '<button type="button" onclick="expandNews(' + Number(item.id) + ')" style="background:none; border:none; color:var(--primary-blue); font-weight:bold; cursor:pointer; padding:0; margin-top:10px;">Read More &rarr;</button>' +
@@ -301,6 +339,11 @@ function fetchNews() {
                         '</div>' +
                     '</div>';
             });
+
+            if (targetNewsId !== null) {
+                var targetEl = document.getElementById('news-' + targetNewsId);
+                if (targetEl) {targetEl.scrollIntoView({ block: 'center' });}
+            }
         })
         .catch(function () {
             container.innerHTML = '<p style="color:red; text-align:center;">Failed to load updates.</p>';
@@ -321,7 +364,18 @@ window.collapseNews = function (id) {
     if (shortEl) {shortEl.style.display = 'block';}
 };
 
-function showPage(pageId) {
+window.copyNewsShareLink = async function (id) {
+    var url = window.location.origin + PAGE_ROUTES.updates + '?news=' + encodeURIComponent(id);
+    try {
+        await navigator.clipboard.writeText(url);
+        alert('Shareable link copied: ' + url);
+    } catch (error) {
+        alert('Could not copy the shareable link. ' + (error.message || ''));
+    }
+};
+
+function showPage(pageId, options) {
+    options = options || {};
     var mains = document.querySelectorAll('main');
     for (var i = 0; i < mains.length; i++) {mains[i].style.display = 'none';}
     var target = document.getElementById('page-' + pageId);
@@ -330,6 +384,25 @@ function showPage(pageId) {
     if (pageId === 'updates') {fetchNews();}
     if (pageId === 'history') {loadMyPinHistory();}
     if (pageId === 'tutorials') {openTutorialsPage();} // Load tutorials
+
+    var links = document.querySelectorAll('nav a[data-page]');
+    for (var j = 0; j < links.length; j++) {
+        if (links[j].getAttribute('data-page') === pageId) {
+            links[j].setAttribute('aria-current', 'page');
+        } else {
+            links[j].removeAttribute('aria-current');
+        }
+    }
+
+    if (!options.skipHistory) {
+        var url = PAGE_ROUTES[pageId] || '/';
+        if (options.search) {url += options.search;}
+        if (options.replace) {
+            window.history.replaceState({ page: pageId }, '', url);
+        } else {
+            window.history.pushState({ page: pageId }, '', url);
+        }
+    }
 }
 
 function fetchExams() {
@@ -564,7 +637,8 @@ async function verifyTutorialPayment(examId, reference) {
 
 // -------------------------
 
-function openExamPackages(examId) {
+function openExamPackages(examId, options) {
+    options = options || {};
     currentExam = dbExams.find(function (e) { return e.id === examId; });
     if (!currentExam) {return;}
     var titleEl = document.getElementById('pkg-exam-title');
@@ -575,7 +649,7 @@ function openExamPackages(examId) {
     if (shareBtn) {
         shareBtn.onclick = function () {
             return withButtonLoading(shareBtn, 'Copying...', async function () {
-                var url = window.location.origin + window.location.pathname + '?exam=' + encodeURIComponent(currentExam.slug);
+                var url = window.location.origin + PAGE_ROUTES.packages + '?exam=' + encodeURIComponent(currentExam.slug);
                 try {
                     await navigator.clipboard.writeText(url);
                     alert('Shareable link copied: ' + url);
@@ -593,7 +667,10 @@ function openExamPackages(examId) {
     document.getElementById('pkg-per-subject').style.display = allow.per_subject ? 'block' : 'none';
     document.getElementById('pkg-per-dept').style.display = allow.per_dept ? 'block' : 'none';
     document.getElementById('pkg-all-subjects').style.display = allow.all_subjects ? 'block' : 'none';
-    showPage('packages');
+    showPage('packages', {
+        search: '?exam=' + encodeURIComponent(currentExam.slug),
+        replace: options.replace === true
+    });
 }
 
 function openCheckout(packageType) {
@@ -834,16 +911,44 @@ if (enquiryForm) {
     });
 }
 
-function checkSharedLink() {
+// Renders whichever section the current URL points at. Exam links need the
+// exam list first; everything else can render immediately.
+function renderCurrentUrl(force) {
     var urlParams = new URLSearchParams(window.location.search);
     var examSlug = urlParams.get('exam');
-    if (examSlug) { var exam = dbExams.find(function (e) { return e.slug === examSlug; }); if (exam) { openExamPackages(exam.id); } }
+    if (examSlug) {
+        var exam = dbExams.find(function (e) { return e.slug === examSlug; });
+        if (exam) {openExamPackages(exam.id, { skipHistory: true }); return;}
+        if (!force) {return;}
+    }
+    if (getSharedNewsId() !== null) {showPage('updates', { skipHistory: true }); return;}
+    showPage(pageForCurrentPath(), { skipHistory: true });
 }
 
 function initSite() {
-    displayDeviceId(); handleReturnedPayment();
-    if (/^#news-\d+$/.test(window.location.hash)) { showPage('updates'); }
-    if (document.getElementById('home-exam-grid')) { fetchExams().then(function () { checkSharedLink(); }); }
+    displayDeviceId();
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('reference') || params.get('trxref')) {
+        handleReturnedPayment();
+        return;
+    }
+    renderCurrentUrl(false);
+    fetchExams().then(function () {
+        if (new URLSearchParams(window.location.search).get('exam')) {renderCurrentUrl(true);}
+    });
 }
+
+window.addEventListener('popstate', function () {
+    renderCurrentUrl(true);
+});
+
+document.addEventListener('click', function (event) {
+    var link = event.target.closest ? event.target.closest('nav a[data-page]') : null;
+    if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+        return;
+    }
+    event.preventDefault();
+    showPage(link.getAttribute('data-page'));
+});
 
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initSite); } else { initSite(); }

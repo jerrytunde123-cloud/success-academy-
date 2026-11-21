@@ -16,6 +16,9 @@ process.env.R2_ACCESS_KEY_ID = 'test-access-key';
 process.env.R2_SECRET_ACCESS_KEY = 'test-secret-key';
 process.env.R2_BUCKET_NAME = 'success-academy-test';
 process.env.R2_PUBLIC_URL = 'https://cdn.example.com';
+process.env.EMAILJS_PUBLIC_KEY = 'test-emailjs-public-key';
+process.env.EMAILJS_SERVICE_ID = 'service_test';
+process.env.EMAILJS_TEMPLATE_ID = 'template_test';
 
 const db = require('../lib/db');
 const { ensureSchema, __resetSchemaForTests } = require('../lib/schema');
@@ -56,6 +59,7 @@ const adminPinsApi = require('../lib/handlers/admin/pins');
 const adminOrdersApi = require('../lib/handlers/admin/orders');
 const adminNewsApi = require('../lib/handlers/admin/news');
 const adminEnquiriesApi = require('../lib/handlers/admin/enquiries');
+const adminEmailjsApi = require('../lib/handlers/admin/emailjs');
 const adminUploadApi = require('../lib/handlers/admin/upload');
 
 let verifyAmount = 100000;
@@ -272,6 +276,9 @@ test('checkout, claim, verify and admin flows work end to end', async function (
 
         const orders = await call(adminOrdersApi, { url: '/api/admin/orders' });
         assert.equal(orders.statusCode, 401);
+
+        const emailjs = await call(adminEmailjsApi, { url: '/api/admin/emailjs' });
+        assert.equal(emailjs.statusCode, 401);
     });
 
     await t.test('admin login rejects a wrong password', async function () {
@@ -302,6 +309,39 @@ test('checkout, claim, verify and admin flows work end to end', async function (
         });
         assert.equal(session.statusCode, 200);
         assert.equal(session.body.authenticated, true);
+    });
+
+    await t.test('EmailJS config is available only to admins and never hardcoded', async function () {
+        const configured = await call(adminEmailjsApi, {
+            url: '/api/admin/emailjs',
+            headers: { cookie: adminCookie }
+        });
+        assert.equal(configured.statusCode, 200);
+        assert.deepEqual(configured.body, {
+            enabled: true,
+            publicKey: 'test-emailjs-public-key',
+            serviceId: 'service_test',
+            templateId: 'template_test'
+        });
+
+        const saved = {
+            publicKey: process.env.EMAILJS_PUBLIC_KEY,
+            serviceId: process.env.EMAILJS_SERVICE_ID,
+            templateId: process.env.EMAILJS_TEMPLATE_ID
+        };
+        delete process.env.EMAILJS_PUBLIC_KEY;
+        try {
+            const missing = await call(adminEmailjsApi, {
+                url: '/api/admin/emailjs',
+                headers: { cookie: adminCookie }
+            });
+            assert.equal(missing.body.enabled, false);
+            assert.equal(missing.body.publicKey, '');
+        } finally {
+            process.env.EMAILJS_PUBLIC_KEY = saved.publicKey;
+            process.env.EMAILJS_SERVICE_ID = saved.serviceId;
+            process.env.EMAILJS_TEMPLATE_ID = saved.templateId;
+        }
     });
 
     await t.test('admin stats show sold PINs and revenue', async function () {
@@ -625,14 +665,23 @@ test('checkout, claim, verify and admin flows work end to end', async function (
         const enquiry = list.body.find(function (entry) { return entry.email === 'ada@example.com'; });
         assert.ok(enquiry);
 
+        const attemptedServerSend = await call(adminEnquiriesApi, {
+            method: 'POST',
+            url: '/api/admin/enquiries',
+            headers: { cookie: adminCookie },
+            body: { id: enquiry.id, message: 'We have sent your PIN.' }
+        });
+        assert.equal(attemptedServerSend.statusCode, 400);
+
         const replied = await call(adminEnquiriesApi, {
             method: 'POST',
             url: '/api/admin/enquiries',
             headers: { cookie: adminCookie },
-            body: { id: enquiry.id, message: 'We have sent your PIN.', markOnly: true }
+            body: { id: enquiry.id, message: 'We have sent your PIN.', recordOnly: true }
         });
         assert.equal(replied.statusCode, 200);
-        assert.equal(replied.body.emailed, false);
+        assert.equal(replied.body.recorded, true);
+        assert.equal(replied.body.channel, 'emailjs');
 
         const afterReply = await call(adminEnquiriesApi, {
             url: '/api/admin/enquiries',

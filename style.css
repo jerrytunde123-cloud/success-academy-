@@ -86,7 +86,8 @@ nav a {
     transition: 0.3s;
 }
 
-nav a:hover { 
+nav a:hover,
+nav a[aria-current="page"] {
     color: var(--accent-yellow); 
 }
 

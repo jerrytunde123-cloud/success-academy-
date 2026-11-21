@@ -1,6 +1,7 @@
 const { handle, json } = require('../../lib/http');
 
 const routes = {
+    emailjs: require('../../lib/handlers/admin/emailjs'),
     enquiries: require('../../lib/handlers/admin/enquiries'),
     exams: require('../../lib/handlers/admin/exams'),
     login: require('../../lib/handlers/admin/login'),
