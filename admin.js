@@ -171,43 +171,11 @@ function renderResultSettings(products) {
         box.innerHTML =
             '<h4>' + escapeHtml(product.name) + ' — ' + Number(product.available) + ' available, ' + Number(product.sold) + ' sold</h4>' +
             '<div class="row">' +
-                '<label style="width:120px;">Retail price (₦):</label>' +
+                '<label style="width:120px;">Price (₦):</label>' +
                 '<input type="number" min="0" step="1" style="width:auto;" id="result-price-' + key + '" value="' + Number(product.price) + '">' +
-                '<label style="width:120px;">Cost price (₦):</label>' +
-                '<input type="number" min="0" step="1" style="width:auto;" id="result-cost-' + key + '" value="' + Number(product.cost) + '">' +
                 '<label><input type="checkbox" id="result-active-' + key + '"' + (product.active ? ' checked' : '') + '> Enabled</label>' +
-            '</div>' +
-            '<div class="row"><label style="width:120px;">Official portal:</label>' +
-                '<input type="url" id="result-portal-' + key + '" value="' + escapeHtml(product.portalUrl) + '"></div>' +
-            '<label style="display:block; margin-bottom:5px;">Customer instructions:</label>' +
-            '<textarea rows="3" id="result-instructions-' + key + '">' + escapeHtml(product.instructions) + '</textarea>';
+            '</div>';
         container.appendChild(box);
-    });
-}
-
-function renderResultStock(stock) {
-    var body = $('result-stock-body');
-    if (!body) {return;}
-    body.innerHTML = '';
-    if (!stock || stock.length === 0) {
-        body.innerHTML = '<tr><td colspan="8">No result PINs have been added yet.</td></tr>';
-        return;
-    }
-    stock.forEach(function (item) {
-        var row = document.createElement('tr');
-        var canDelete = item.status === 'available';
-        row.innerHTML =
-            '<td>' + Number(item.id) + '</td>' +
-            '<td>' + escapeHtml(item.productName || item.productId) + '</td>' +
-            '<td><strong>' + escapeHtml(item.pin) + '</strong></td>' +
-            '<td>' + escapeHtml(item.serial || '—') + '</td>' +
-            '<td>' + escapeHtml(item.batch || '—') + '</td>' +
-            '<td>' + escapeHtml(item.status) + '</td>' +
-            '<td>' + escapeHtml((item.email || '—') + (item.deviceId ? ' / ' + item.deviceId : '')) + '</td>' +
-            '<td>' + (canDelete
-                ? '<button type="button" class="danger-btn" onclick="withButtonLoading(this, \'Deleting...\', () => deleteResultPin(' + Number(item.id) + '))">Delete</button>'
-                : '—') + '</td>';
-        body.appendChild(row);
     });
 }
 
@@ -223,12 +191,12 @@ function renderResultOrders(orders) {
         var row = document.createElement('tr');
         var pending = order.status === 'pending';
         row.innerHTML =
+            '<td>' + escapeHtml(String(order.createdAt).slice(0, 10)) + '</td>' +
             '<td>' + escapeHtml(order.reference) + '</td>' +
             '<td>' + escapeHtml(order.productName || order.productId) + '</td>' +
             '<td>₦' + Number(order.amount / 100).toLocaleString() + '</td>' +
-            '<td>' + escapeHtml(order.status) + (order.emailedAt ? ' / emailed' : '') + '</td>' +
+            '<td>' + escapeHtml(order.status) + '</td>' +
             '<td>' + escapeHtml(order.email) + '</td>' +
-            '<td>' + escapeHtml(String(order.createdAt).slice(0, 10)) + '</td>' +
             '<td>' + (pending
                 ? '<button type="button" class="danger-btn" disabled title="Pending orders cannot be deleted">Delete</button>'
                 : '<button type="button" class="danger-btn" onclick="withButtonLoading(this, \'Deleting...\', () => deleteResultOrder(\'' + escapeHtml(order.reference) + '\'))">Delete</button>') + '</td>';
@@ -240,7 +208,6 @@ async function loadResultData() {
     try {
         resultData = await api('/admin/result-pins');
         renderResultSettings(resultData.products);
-        renderResultStock(resultData.stock);
         renderResultOrders(resultData.orders);
 
         var select = $('result-stock-product');
@@ -265,10 +232,12 @@ window.saveResultProducts = async function () {
         return {
             id: product.id,
             price: $('result-price-' + key).value,
-            cost: $('result-cost-' + key).value,
             active: $('result-active-' + key).checked,
-            portalUrl: $('result-portal-' + key).value,
-            instructions: $('result-instructions-' + key).value
+            // Kept from the loaded product so saving prices does not erase
+            // settings that are hidden from this simplified screen.
+            cost: product.cost,
+            portalUrl: product.portalUrl,
+            instructions: product.instructions
         };
     });
     if (updates.length === 0) {return;}
@@ -285,13 +254,12 @@ window.saveResultProducts = async function () {
 window.addResultPins = async function () {
     var productId = $('result-stock-product').value;
     var lines = $('result-stock-lines').value;
-    var batch = $('result-stock-batch').value.trim();
     if (!productId) {return alert('Select a product first.');}
     if (!lines.trim()) {return alert('Enter at least one PIN or token.');}
     try {
         var data = await api('/admin/result-pins', {
             method: 'POST',
-            body: { action: 'addPins', productId: productId, lines: lines, batch: batch }
+            body: { action: 'addPins', productId: productId, lines: lines }
         });
         var message = 'Added ' + data.added + ' PIN(s).';
         if (data.skipped) {message += ' Skipped ' + data.skipped + ' duplicate(s).';}
@@ -300,17 +268,6 @@ window.addResultPins = async function () {
         await loadResultData();
     } catch (err) {
         setText('result-add-status', err.message);
-    }
-};
-
-window.deleteResultPin = async function (id) {
-    var confirmed = await confirmDeletion('Delete this PIN?', 'This stock record will be removed permanently.', false);
-    if (!confirmed) {return;}
-    try {
-        await api('/admin/result-pins', { method: 'POST', body: { action: 'deletePin', id: Number(id) } });
-        await loadResultData();
-    } catch (err) {
-        alert(err.message);
     }
 };
 

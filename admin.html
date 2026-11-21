@@ -164,30 +164,28 @@
         </div>
 
         <div id="tab-results" class="section">
-            <h3>Result PIN Products &amp; Prices</h3>
-            <p style="font-size:13px; color:#666;">Retail price is what buyers pay. Cost price is private, for your records only.</p>
-            <div id="result-products-form"></div>
-            <button class="save-btn" onclick="withButtonLoading(this, 'Saving...', saveResultProducts)">Save Prices &amp; Settings</button>
-            <p id="result-settings-status" role="status" style="color:#b42318;"></p>
+            <h3>Result PINs</h3>
 
-            <h3 style="margin-top:25px;">Add PIN Stock</h3>
-            <div class="row">
-                <select id="result-stock-product" style="width:auto; min-width:220px;"></select>
-                <input type="text" id="result-stock-batch" placeholder="Batch label (optional)" style="width:auto; min-width:180px;">
+            <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <h4 style="margin-top:0;">Prices</h4>
+                <div id="result-products-form"></div>
+                <button class="save-btn" onclick="withButtonLoading(this, 'Saving...', saveResultProducts)">Save Prices</button>
+                <p id="result-settings-status" role="status" style="color:#b42318;"></p>
             </div>
-            <textarea id="result-stock-lines" rows="6" placeholder="One credential per line.&#10;WAEC: PIN, SERIAL&#10;NECO: 000000000000"></textarea>
-            <button class="save-btn" onclick="withButtonLoading(this, 'Adding...', addResultPins)">Add PINs to Stock</button>
-            <p id="result-add-status" role="status" style="color:#b42318;"></p>
 
-            <h3 style="margin-top:25px;">Available &amp; Sold PINs</h3>
-            <div class="table-wrap"><table>
-                <thead><tr><th>ID</th><th>Product</th><th>PIN / Token</th><th>Serial</th><th>Batch</th><th>Status</th><th>Buyer</th><th></th></tr></thead>
-                <tbody id="result-stock-body"></tbody>
-            </table></div>
+            <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <h4 style="margin-top:0;">Add PINs</h4>
+                <div class="row">
+                    <select id="result-stock-product" style="width:auto; min-width:220px;"></select>
+                </div>
+                <textarea id="result-stock-lines" rows="5" placeholder="WAEC: PIN, SERIAL per line&#10;NECO: 12-digit token per line"></textarea>
+                <button class="save-btn" onclick="withButtonLoading(this, 'Adding...', addResultPins)">Add PINs</button>
+                <p id="result-add-status" role="status" style="color:#b42318;"></p>
+            </div>
 
-            <h3 style="margin-top:25px;">Result PIN Orders</h3>
+            <h3>Recent Orders</h3>
             <div class="table-wrap"><table>
-                <thead><tr><th>Reference</th><th>Product</th><th>Amount</th><th>Status</th><th>Email</th><th>Date</th><th></th></tr></thead>
+                <thead><tr><th>Date</th><th>Reference</th><th>Product</th><th>Amount</th><th>Status</th><th>Email</th><th></th></tr></thead>
                 <tbody id="result-orders-body"></tbody>
             </table></div>
         </div>
@@ -271,6 +269,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@5/dist/email.min.js"></script>
-    <script src="admin.js"></script>
+    <script src="admin.js?v=2"></script>
 </body>
 </html>

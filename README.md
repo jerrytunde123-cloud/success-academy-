@@ -169,7 +169,7 @@ Tests use an in-memory `node:sqlite` database and a mocked Paystack API; they do
 Open `/admin` and log in with `ADMIN_PASSWORD`.
 
 - **Manage Exams** — edit package prices and availability; edit subject text answers, public thumbnails, and private Q&A images. Subject thumbnails and Q&A images can be removed.
-- **Result PINs** — edit retail/cost prices, enable or disable WAEC/NECO, add bulk stock (one `PIN, SERIAL` per line for WAEC; one 12-digit token per line for NECO), and review stock/orders. Sold or reserved PINs cannot be deleted.
+- **Result PINs** — a simple screen for the essentials: edit retail prices, enable or disable WAEC/NECO, add bulk stock (one `PIN, SERIAL` per line for WAEC; one 12-digit token per line for NECO), see available/sold counts, and review recent orders.
 - **PIN History** — see every exam-answer PIN (paid and pending), create manual PINs for a device ID, and permanently delete PINs. Deleting a PIN revokes access but keeps any related order history.
 - **Orders** — review payment records. Pending orders cannot be deleted while payment may still complete. Deleting a paid order also deletes its linked PIN and revokes access.
 - **Manage News** — publish/edit/delete updates and upload up to 5 images.
