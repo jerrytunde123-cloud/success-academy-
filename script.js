@@ -389,7 +389,7 @@ function showPage(pageId, options) {
     if (pageId === 'updates') {fetchNews();}
     if (pageId === 'history') {loadMyPinHistory();}
     if (pageId === 'tutorials') {openTutorialsPage();} // Load tutorials
-    if (pageId === 'results') {loadResultProducts();}
+    if (pageId === 'results') {loadResultProducts(options.resultProduct);}
 
     var links = document.querySelectorAll('nav a[data-page]');
     for (var j = 0; j < links.length; j++) {
@@ -432,7 +432,43 @@ function renderExams() {
         var title = document.createElement('h3'); title.style.marginTop = '10px'; title.style.color = 'var(--primary-blue)'; title.style.fontSize = '16px'; title.textContent = exam.name;
         card.appendChild(img); card.appendChild(title); grid.appendChild(card);
     });
-    
+
+    // Result-checker PINs are a separate product from answer packages, but
+    // buyers still expect to find WAEC and NECO from the same home list.
+    [
+        { id: 'waec', name: 'WAEC Result PIN', logo: '/assets/waec-logo.png', note: 'Result checker e-PIN' },
+        { id: 'neco', name: 'NECO Result PIN', logo: '/assets/neco-logo.png', note: 'Result checker token' }
+    ].forEach(function (product) {
+        var card = document.createElement('div');
+        card.className = 'exam-card';
+        card.setAttribute('data-result-shortcut', product.id);
+        card.onclick = function () {
+            showPage('results', {
+                search: '?product=' + encodeURIComponent(product.id),
+                resultProduct: product.id
+            });
+        };
+
+        var fallbackImg = 'https://placehold.co/60x60/001f5b/ffcc00?text=' + encodeURIComponent(product.name.substring(0, 2));
+        var img = document.createElement('img');
+        img.src = product.logo;
+        img.alt = product.name;
+        img.onerror = function () { this.onerror = null; this.src = fallbackImg; };
+
+        var title = document.createElement('h3');
+        title.style.cssText = 'margin-top:10px; color:var(--primary-blue); font-size:16px;';
+        title.textContent = product.name;
+
+        var note = document.createElement('p');
+        note.style.cssText = 'font-size:12px; color:#666; margin:5px 0 0;';
+        note.textContent = product.note;
+
+        card.appendChild(img);
+        card.appendChild(title);
+        card.appendChild(note);
+        grid.appendChild(card);
+    });
+
     // ⚠️ ADD TUTORIAL CARD
     var tutCard = document.createElement('div');
     tutCard.className = 'exam-card';
@@ -873,6 +909,7 @@ function renderResultProducts(products) {
     products.forEach(function (product) {
         var card = document.createElement('div');
         card.className = 'exam-card';
+        card.setAttribute('data-result-product', product.id);
 
         var logo = String(product.logo || '');
         var src = /^https?:\/\//i.test(logo) ? logo : '/' + logo.replace(/^\/+/, '');
@@ -909,7 +946,21 @@ function renderResultProducts(products) {
     });
 }
 
-function loadResultProducts() {
+function focusResultProduct(productId) {
+    if (!productId) {return;}
+    var grid = document.getElementById('result-product-grid');
+    if (!grid) {return;}
+    var cards = Array.prototype.slice.call(grid.querySelectorAll('[data-result-product]'));
+    cards.forEach(function (card) { card.classList.remove('result-focus'); });
+    var target = cards.find(function (card) { return card.getAttribute('data-result-product') === productId; });
+    if (!target) {return;}
+    target.classList.add('result-focus');
+    if (typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+}
+
+function loadResultProducts(focusProductId) {
     var grid = document.getElementById('result-product-grid');
     if (!grid) {return Promise.resolve();}
     grid.innerHTML = 'Loading...';
@@ -918,6 +969,7 @@ function loadResultProducts() {
         .then(function (data) {
             resultProducts = Array.isArray(data.products) ? data.products : [];
             renderResultProducts(resultProducts);
+            focusResultProduct(focusProductId);
         })
         .catch(function (error) {
             grid.innerHTML = '';
@@ -1242,7 +1294,13 @@ function renderCurrentUrl(force) {
         if (!force) {return;}
     }
     if (getSharedNewsId() !== null) {showPage('updates', { skipHistory: true }); return;}
-    showPage(pageForCurrentPath(), { skipHistory: true });
+
+    var pageId = pageForCurrentPath();
+    var options = { skipHistory: true };
+    if (pageId === 'results' && urlParams.get('product')) {
+        options.resultProduct = urlParams.get('product');
+    }
+    showPage(pageId, options);
 }
 
 function initSite() {
