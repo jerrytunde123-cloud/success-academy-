@@ -10,6 +10,9 @@ var currentPrice = 0;
 var paystackPublicKey = null;
 var paystackPublicKeyPromise = null;
 var selectedTutorialExam = null;
+var resultProducts = [];
+var resultEmailConfig = null;
+var currentResultDelivery = null;
 
 const FALLBACK_PAYSTACK_PUBLIC_KEY = 'pk_live_456f9eef46c22ffa9c1f16d000f008926ca5c043';
 const PLACEHOLDER_SELECT = 'https://placehold.co/300x150/001f5b/ffffff?text=Select+a+Subject';
@@ -21,6 +24,7 @@ const PAGE_ROUTES = {
     home: '/',
     updates: '/updates',
     tutorials: '/tutorials',
+    results: '/result-pins',
     packages: '/packages',
     history: '/my-pins',
     verify: '/view-content'
@@ -29,6 +33,7 @@ const ROUTE_PAGES = {
     '/': 'home',
     '/updates': 'updates',
     '/tutorials': 'tutorials',
+    '/result-pins': 'results',
     '/packages': 'packages',
     '/my-pins': 'history',
     '/view-content': 'verify'
@@ -384,6 +389,7 @@ function showPage(pageId, options) {
     if (pageId === 'updates') {fetchNews();}
     if (pageId === 'history') {loadMyPinHistory();}
     if (pageId === 'tutorials') {openTutorialsPage();} // Load tutorials
+    if (pageId === 'results') {loadResultProducts();}
 
     var links = document.querySelectorAll('nav a[data-page]');
     for (var j = 0; j < links.length; j++) {
@@ -842,6 +848,315 @@ function showSuccessPin(data) {
     var modal = document.getElementById('success-modal'); if (modal) {modal.style.display = 'flex';}
 }
 
+// ── WAEC / NECO result-checker PIN products ────────────────────────────────
+
+function setResultText(id, value) {
+    var el = document.getElementById(id);
+    if (el) {el.textContent = value;}
+}
+
+function resultVoucherUrl(data) {
+    return API_URL + '/result-pins/voucher?reference=' + encodeURIComponent(data.reference) +
+        '&token=' + encodeURIComponent(data.claimToken || '');
+}
+
+function renderResultProducts(products) {
+    var grid = document.getElementById('result-product-grid');
+    if (!grid) {return;}
+    grid.innerHTML = '';
+
+    if (!products || products.length === 0) {
+        grid.innerHTML = '<p style="text-align:center; color:#666;">No result PIN products are available right now.</p>';
+        return;
+    }
+
+    products.forEach(function (product) {
+        var card = document.createElement('div');
+        card.className = 'exam-card';
+
+        var logo = String(product.logo || '');
+        var src = /^https?:\/\//i.test(logo) ? logo : '/' + logo.replace(/^\/+/, '');
+        var img = document.createElement('img');
+        img.src = logo ? src : '/assets/logo.png';
+        img.alt = product.name;
+
+        var title = document.createElement('h3');
+        title.style.cssText = 'margin-top:10px; color:var(--primary-blue); font-size:16px;';
+        title.textContent = product.name;
+
+        var price = document.createElement('p');
+        price.style.cssText = 'font-weight:bold; color:#001f5b; margin:6px 0;';
+        price.textContent = '₦' + Number(product.price).toLocaleString();
+
+        var stock = document.createElement('p');
+        stock.style.cssText = 'font-size:12px; color:#666; margin:0 0 10px;';
+        stock.textContent = product.available + ' available';
+
+        var button = document.createElement('button');
+        button.className = 'btn-buy';
+        button.textContent = product.available > 0 ? 'Buy Now' : 'Out of Stock';
+        button.disabled = product.available === 0;
+        button.onclick = function () {
+            withButtonLoading(this, 'Starting...', function () { return payForResultProduct(product.id); });
+        };
+
+        card.appendChild(img);
+        card.appendChild(title);
+        card.appendChild(price);
+        card.appendChild(stock);
+        card.appendChild(button);
+        grid.appendChild(card);
+    });
+}
+
+function loadResultProducts() {
+    var grid = document.getElementById('result-product-grid');
+    if (!grid) {return Promise.resolve();}
+    grid.innerHTML = 'Loading...';
+    return fetch(API_URL + '/result-pins/catalog', { cache: 'no-store' })
+        .then(function (response) { return response.json().catch(function () { return {}; }).then(function (data) { if (!response.ok) {throw new Error(data.error || 'Could not load result PINs.');} return data; }); })
+        .then(function (data) {
+            resultProducts = Array.isArray(data.products) ? data.products : [];
+            renderResultProducts(resultProducts);
+        })
+        .catch(function (error) {
+            grid.innerHTML = '';
+            setResultText('result-status', error.message || 'Could not load result PINs.');
+        });
+}
+
+function payForResultProduct(productId) {
+    var product = resultProducts.find(function (item) { return item.id === productId; });
+    if (!product) {return Promise.resolve();}
+
+    var emailInput = document.getElementById('result-email');
+    var email = emailInput ? emailInput.value.trim() : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        if (emailInput) {emailInput.focus();}
+        alert('Enter a valid email address for your PIN and receipt.');
+        return Promise.resolve();
+    }
+    try { localStorage.setItem('sa_email', email); } catch (_err) { /* optional */ }
+
+    var deviceId = getDeviceId();
+    try {
+        setVerifiedLocalStorage('sa_device_id', deviceId);
+    } catch (error) {
+        alert(error.message || 'Enable browser storage before starting checkout.');
+        return Promise.resolve();
+    }
+
+    var startCheckout = function () {
+        return Promise.all([
+            getPaystackPublicKey(),
+            fetch(API_URL + '/result-pins/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productId: productId, email: email, deviceId: deviceId })
+            }).then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (!response.ok) {throw new Error(data.error || 'Checkout failed.');}
+                    return data;
+                });
+            })
+        ]).then(function (results) {
+            var publicKey = results[0];
+            var data = results[1];
+            return new Promise(function (resolve, reject) {
+                var popup = new PaystackPop();
+                var callbacks = {
+                    onSuccess: function (transaction) {
+                        var reference = (transaction && transaction.reference) || data.reference;
+                        resolve(claimResultPayment(reference, 0));
+                    },
+                    onCancel: function () { resolve(null); },
+                    onError: function (error) { reject(new Error((error && error.message) || 'Payment could not load.')); }
+                };
+                if (data.accessCode) {
+                    popup.resumeTransaction(data.accessCode, callbacks);
+                } else {
+                    popup.newTransaction({
+                        key: publicKey,
+                        email: email,
+                        amount: Math.round(Number(data.amount) * 100),
+                        currency: data.currency || 'NGN',
+                        reference: data.reference,
+                        onSuccess: callbacks.onSuccess,
+                        onCancel: callbacks.onCancel,
+                        onError: callbacks.onError
+                    });
+                }
+            });
+        });
+    };
+
+    if (!isPaystackReady()) {
+        return whenPaystackReady().then(function (ready) {
+            if (!ready) {alert('Payment library could not load.'); return null;}
+            return startCheckout();
+        });
+    }
+    return startCheckout();
+}
+
+function claimResultPayment(reference, attempt) {
+    var tries = Number(attempt) || 0;
+    reference = String(reference || '').trim().toUpperCase();
+    return fetch(API_URL + '/result-pins/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference: reference, deviceId: getDeviceId() })
+    })
+        .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+                if (!response.ok) {var error = new Error(data.error || 'Could not verify payment.'); error.status = response.status; throw error;}
+                return data;
+            });
+        })
+        .then(function (data) {
+            setResultText('result-status', '');
+            clearReturnedPayment(reference);
+            showResultSuccess(data);
+            return data;
+        })
+        .catch(function (error) {
+            if (error.status === 402 && tries < 3) {
+                return new Promise(function (resolve) { setTimeout(resolve, 2500); })
+                    .then(function () { return claimResultPayment(reference, tries + 1); });
+            }
+            setResultText('result-status', error.message || 'Could not verify payment.');
+            return null;
+        });
+}
+
+function waitForEmailJS() {
+    if (window.emailjs && typeof window.emailjs.send === 'function') {return Promise.resolve(true);}
+    var waited = 0;
+    return new Promise(function (resolve) {
+        var timer = setInterval(function () {
+            waited += 100;
+            if (window.emailjs && typeof window.emailjs.send === 'function') {
+                clearInterval(timer);
+                resolve(true);
+            } else if (waited >= 5000) {
+                clearInterval(timer);
+                resolve(false);
+            }
+        }, 100);
+    });
+}
+
+function loadResultEmailConfig() {
+    if (resultEmailConfig) {return Promise.resolve(resultEmailConfig);}
+    return fetch(API_URL + '/result-pins/emailjs', { cache: 'no-store' })
+        .then(function (response) { return response.json().catch(function () { return {}; }); })
+        .then(function (config) {
+            resultEmailConfig = config && config.enabled ? config : null;
+            return resultEmailConfig;
+        })
+        .catch(function () { resultEmailConfig = null; return null; });
+}
+
+async function sendResultEmail(data) {
+    var status = document.getElementById('result-email-status');
+    var retry = document.getElementById('result-email-retry');
+    if (!data || !data.claimToken) {return;}
+    var setStatus = function (message, color) {
+        if (status) {status.textContent = message; status.style.color = color || '#666';}
+    };
+
+    var config = await loadResultEmailConfig();
+    if (!config) {
+        setStatus('Automatic email is not configured. Download your PDF voucher instead.', '#b42318');
+        return;
+    }
+    if (!await waitForEmailJS()) {
+        setStatus('Email service could not load. Download your PDF voucher instead.', '#b42318');
+        return;
+    }
+
+    setStatus('Sending email...', '#0066cc');
+    try {
+        await window.emailjs.send(
+            config.serviceId,
+            config.templateId,
+            {
+                to_name: 'Student',
+                to_email: data.email || '',
+                product_name: data.productName || '',
+                pin: data.pin || '',
+                serial: data.serial || '',
+                portal_url: data.portalUrl || '',
+                instructions: data.instructions || '',
+                reference: data.reference || '',
+                download_url: window.location.origin + resultVoucherUrl(data),
+                purchase_date: data.date || '',
+                amount: 'NGN ' + Number(data.amount || 0).toLocaleString()
+            },
+            {
+                publicKey: config.publicKey,
+                limitRate: { id: 'sa-result-receipt', throttle: 1000 }
+            }
+        );
+    } catch (error) {
+        setStatus('Email could not be sent. Use the download button or retry.', '#b42318');
+        if (retry) {retry.style.display = 'inline-block';}
+        return;
+    }
+
+    try {
+        await fetch(API_URL + '/result-pins/emailed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: data.reference, token: data.claimToken })
+        });
+    } catch (_err) {
+        // The receipt was sent; recording the outcome is best-effort.
+    }
+    setStatus('Sent to ' + (data.email || 'your email') + '. Check your inbox and spam folder.', 'green');
+    if (retry) {retry.style.display = 'none';}
+}
+
+function showResultSuccess(data) {
+    currentResultDelivery = data;
+    var panel = document.getElementById('result-success');
+    if (!panel) {return;}
+
+    setResultText('result-pin', data.pin);
+    setResultText('result-serial', data.serial || '');
+    setResultText('result-reference-line', 'Reference: ' + data.reference);
+    setResultText('result-credential-label', data.serial ? 'PIN and serial' : 'token');
+
+    var serialLine = document.getElementById('result-serial-line');
+    if (serialLine) {serialLine.style.display = data.serial ? 'block' : 'none';}
+
+    var portalLink = document.getElementById('result-portal-link');
+    if (portalLink) {
+        portalLink.href = data.portalUrl || '#';
+        portalLink.style.display = data.portalUrl ? 'inline' : 'none';
+    }
+
+    var downloadButton = document.getElementById('result-download-btn');
+    if (downloadButton) {
+        downloadButton.onclick = function () {
+            window.location.href = resultVoucherUrl(data);
+        };
+    }
+
+    var retryButton = document.getElementById('result-email-retry');
+    if (retryButton) {
+        retryButton.style.display = 'none';
+        retryButton.onclick = function () {
+            withButtonLoading(this, 'Sending...', function () { return sendResultEmail(currentResultDelivery); });
+        };
+    }
+
+    setResultText('result-email-status', 'Preparing your email...');
+    panel.style.display = 'block';
+    panel.scrollIntoView({ block: 'center' });
+    sendResultEmail(data);
+}
+
 function handleReturnedPayment() {
     var params = new URLSearchParams(window.location.search);
     var reference = params.get('reference') || params.get('trxref');
@@ -849,6 +1164,11 @@ function handleReturnedPayment() {
     if (/^TUT_[A-F0-9]{16}$/.test(reference)) {
         showPage('tutorials');
         verifyTutorialPayment(null, reference);
+        return;
+    }
+    if (/^RES_[A-F0-9]{16}$/i.test(reference)) {
+        showPage('results', { skipHistory: true });
+        claimResultPayment(reference, 0);
         return;
     }
     if (!/^SA_[A-F0-9]{16,64}$/i.test(reference)) { alert('Invalid payment reference.'); return; }
@@ -927,6 +1247,14 @@ function renderCurrentUrl(force) {
 
 function initSite() {
     displayDeviceId();
+    try {
+        var savedResultEmail = document.getElementById('result-email');
+        if (savedResultEmail && !savedResultEmail.value) {
+            savedResultEmail.value = localStorage.getItem('sa_email') || '';
+        }
+    } catch (_err) {
+        // The email can still be typed manually.
+    }
     var params = new URLSearchParams(window.location.search);
     if (params.get('reference') || params.get('trxref')) {
         handleReturnedPayment();

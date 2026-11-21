@@ -9,6 +9,7 @@
   "rewrites": [
     { "source": "/updates", "destination": "/" },
     { "source": "/tutorials", "destination": "/" },
+    { "source": "/result-pins", "destination": "/" },
     { "source": "/packages", "destination": "/" },
     { "source": "/my-pins", "destination": "/" },
     { "source": "/view-content", "destination": "/" }

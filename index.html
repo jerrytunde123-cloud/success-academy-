@@ -22,6 +22,7 @@
                 <li><a href="/" data-page="home">Home</a></li>
                 <li><a href="/updates" data-page="updates">Updates</a></li>
                 <li><a href="/tutorials" data-page="tutorials">Tutorials</a></li>
+                <li><a href="/result-pins" data-page="results">Result PINs</a></li>
                 <li><a href="/my-pins" data-page="history">My PINs</a></li>
                 <li><a href="/view-content" data-page="verify">View Content</a></li>
             </ul>
@@ -95,6 +96,36 @@
                 <p style="font-size: 12px; color: #666; margin-bottom: 15px;">One-time payment for lifetime access</p>
                 <button class="btn-buy" onclick="payForTutorial()" style="width: 100%; max-width: 300px;">Pay & Join Class</button>
             </div>
+        </div>
+    </main>
+
+    <main id="page-results" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
+        <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
+        <h2 class="section-title">WAEC &amp; NECO Result Checker PINs</h2>
+        <p style="text-align:center; color:#666; margin-top:-15px; margin-bottom:20px;">
+            Buy a genuine result-checker PIN or token. It appears below, downloads as a PDF voucher, and is sent to your email.
+        </p>
+
+        <div style="background:#f8f9fa; padding:18px; border-radius:8px; margin-bottom:20px;">
+            <label for="result-email" style="display:block; font-weight:600; margin-bottom:6px;">Email for your PIN and receipt</label>
+            <input type="email" id="result-email" autocomplete="email" placeholder="you@example.com" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
+        </div>
+
+        <div id="result-product-grid" class="exam-grid"></div>
+        <p id="result-status" role="status" aria-live="polite" style="text-align:center; color:#b42318; margin-top:15px;"></p>
+
+        <div id="result-success" style="display:none; background:white; padding:25px; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin-top:25px; text-align:center;">
+            <h3 style="color:green;">Payment Successful!</h3>
+            <p>Your <span id="result-credential-label">PIN</span>:</p>
+            <h1 id="result-pin" style="letter-spacing:4px; color:var(--primary-blue); word-break:break-all;"></h1>
+            <p id="result-serial-line" style="display:none;">Serial: <strong id="result-serial"></strong></p>
+            <p id="result-reference-line" style="font-size:12px; color:#888;"></p>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:20px 0;">
+                <button id="result-download-btn" class="btn-buy" style="width:auto;"><i class="fas fa-download"></i> Download PDF Voucher</button>
+                <button id="result-email-retry" class="btn-buy" style="width:auto; background:#0088cc; display:none;">Retry Sending Email</button>
+            </div>
+            <p id="result-email-status" style="font-size:13px; color:#666;"></p>
+            <a id="result-portal-link" href="#" target="_blank" rel="noopener noreferrer" style="color:#0088cc;">Check your result on the official portal</a>
         </div>
     </main>
 
@@ -190,6 +221,7 @@
     </footer>
 
     <script async src="https://js.paystack.co/v2/inline.js"></script>
-    <script src="script.js?v=17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@5/dist/email.min.js"></script>
+    <script src="script.js?v=18"></script>
 </body>
 </html>

@@ -19,6 +19,7 @@ process.env.R2_PUBLIC_URL = 'https://cdn.example.com';
 process.env.EMAILJS_PUBLIC_KEY = 'test-emailjs-public-key';
 process.env.EMAILJS_SERVICE_ID = 'service_test';
 process.env.EMAILJS_TEMPLATE_ID = 'template_test';
+process.env.EMAILJS_RESULT_TEMPLATE_ID = 'template_result_test';
 
 const db = require('../lib/db');
 const { ensureSchema, __resetSchemaForTests } = require('../lib/schema');
@@ -61,6 +62,14 @@ const adminNewsApi = require('../lib/handlers/admin/news');
 const adminEnquiriesApi = require('../lib/handlers/admin/enquiries');
 const adminEmailjsApi = require('../lib/handlers/admin/emailjs');
 const adminUploadApi = require('../lib/handlers/admin/upload');
+const adminResultPinsApi = require('../lib/handlers/admin/result-pins');
+
+const resultCatalogApi = require('../lib/handlers/result-pins/catalog');
+const resultCheckoutApi = require('../lib/handlers/result-pins/checkout');
+const resultClaimApi = require('../lib/handlers/result-pins/claim');
+const resultVoucherApi = require('../lib/handlers/result-pins/voucher');
+const resultEmailjsApi = require('../lib/handlers/result-pins/emailjs');
+const resultEmailedApi = require('../lib/handlers/result-pins/emailed');
 
 let verifyAmount = 100000;
 let verifyCurrency = 'NGN';
@@ -768,5 +777,193 @@ test('checkout, claim, verify and admin flows work end to end', async function (
         assert.equal(res.statusCode, 200);
         assert.equal(await getOrder(reference), null);
         assert.equal(await db.queryOne('SELECT pin FROM pins WHERE pin = ?', [pin]), null);
+    });
+});
+
+test('result checker PIN stock, checkout, claim and voucher work end to end', async function (t) {
+    await ensureSchema();
+
+    const deviceId = 'DEV-RESULTPIN1';
+    let adminCookie = '';
+    let reference = '';
+    let claimToken = '';
+
+    await t.test('the catalog is public and seeded with WAEC and NECO', async function () {
+        const res = await call(resultCatalogApi, { url: '/api/result-pins/catalog' });
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.products.length, 2);
+
+        const waec = res.body.products.find(function (product) { return product.id === 'waec'; });
+        assert.equal(waec.price, 5250);
+        assert.equal(waec.serialRequired, true);
+        const neco = res.body.products.find(function (product) { return product.id === 'neco'; });
+        assert.equal(neco.price, 2400);
+        assert.equal(neco.serialRequired, false);
+    });
+
+    await t.test('result admin endpoints require a session', async function () {
+        const res = await call(adminResultPinsApi, { url: '/api/admin/result-pins' });
+        assert.equal(res.statusCode, 401);
+    });
+
+    await t.test('admin login allows result PIN management', async function () {
+        const res = await call(adminLoginApi, postOptions(
+            { password: 'test-admin-password' },
+            { 'x-forwarded-for': '10.9.0.1' }
+        ));
+        assert.equal(res.statusCode, 200);
+        adminCookie = extractCookie(res);
+        assert.match(adminCookie, /^sa_admin=.+/);
+    });
+
+    await t.test('admin adds WAEC and NECO stock and rejects invalid lines', async function () {
+        const bad = await call(adminResultPinsApi, postOptions({
+            action: 'addPins',
+            productId: 'waec',
+            lines: '123\n'
+        }, { cookie: adminCookie }));
+        assert.equal(bad.statusCode, 400);
+
+        const waec = await call(adminResultPinsApi, postOptions({
+            action: 'addPins',
+            productId: 'waec',
+            lines: '1234567890, ABC12345\n1234567890, ABC12345\n987654321098, XYZ12345',
+            batch: 'NOV2026'
+        }, { cookie: adminCookie }));
+        assert.equal(waec.statusCode, 200);
+        assert.equal(waec.body.added, 2);
+        assert.equal(waec.body.skipped, 1);
+
+        const neco = await call(adminResultPinsApi, postOptions({
+            action: 'addPins',
+            productId: 'neco',
+            lines: '000000000001\n000000000002'
+        }, { cookie: adminCookie }));
+        assert.equal(neco.statusCode, 200);
+        assert.equal(neco.body.added, 2);
+    });
+
+    await t.test('checkout reserves one PIN and creates a pending order', async function () {
+        const catalog = await call(resultCatalogApi, { url: '/api/result-pins/catalog' });
+        const waec = catalog.body.products.find(function (product) { return product.id === 'waec'; });
+        assert.equal(waec.available, 2);
+
+        const res = await call(resultCheckoutApi, postOptions({
+            productId: 'waec',
+            email: 'buyer@example.com',
+            deviceId: deviceId
+        }, { 'x-forwarded-for': '10.9.0.2' }));
+        assert.equal(res.statusCode, 200);
+        assert.match(res.body.reference, /^RES_[A-F0-9]{16}$/);
+        assert.equal(res.body.amount, 5250);
+        reference = res.body.reference;
+
+        const order = await db.queryOne('SELECT * FROM result_orders WHERE reference = ?', [reference]);
+        assert.equal(order.status, 'pending');
+        assert.equal(Number(order.amountKobo), 525000);
+
+        const reserved = await db.queryOne('SELECT * FROM result_pins WHERE orderRef = ?', [reference]);
+        assert.equal(reserved.status, 'reserved');
+        assert.equal(reserved.serial, 'ABC12345');
+    });
+
+    await t.test('claim rejects another device and a wrong amount', async function () {
+        const wrongDevice = await call(resultClaimApi, postOptions({
+            reference: reference,
+            deviceId: 'DEV-SOMEONEELSE'
+        }, { 'x-forwarded-for': '10.9.0.3' }));
+        assert.equal(wrongDevice.statusCode, 403);
+
+        verifyAmount = 1;
+        const wrongAmount = await call(resultClaimApi, postOptions({
+            reference: reference,
+            deviceId: deviceId
+        }, { 'x-forwarded-for': '10.9.0.4' }));
+        assert.equal(wrongAmount.statusCode, 400);
+        verifyAmount = 525000;
+
+        const order = await db.queryOne('SELECT status FROM result_orders WHERE reference = ?', [reference]);
+        assert.equal(order.status, 'pending');
+    });
+
+    await t.test('verified payment returns the PIN and a voucher token', async function () {
+        const res = await call(resultClaimApi, postOptions({
+            reference: reference,
+            deviceId: deviceId
+        }, { 'x-forwarded-for': '10.9.0.5' }));
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.pin, '1234567890');
+        assert.equal(res.body.serial, 'ABC12345');
+        assert.equal(res.body.email, 'buyer@example.com');
+        assert.match(res.body.claimToken, /^[a-f0-9]{32}$/);
+        claimToken = res.body.claimToken;
+
+        const order = await db.queryOne('SELECT * FROM result_orders WHERE reference = ?', [reference]);
+        assert.equal(order.status, 'paid');
+        const sold = await db.queryOne('SELECT * FROM result_pins WHERE orderRef = ?', [reference]);
+        assert.equal(sold.status, 'sold');
+    });
+
+    await t.test('a second claim is idempotent', async function () {
+        const res = await call(resultClaimApi, postOptions({
+            reference: reference,
+            deviceId: deviceId
+        }, { 'x-forwarded-for': '10.9.0.6' }));
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.body.claimToken, claimToken);
+    });
+
+    await t.test('the PDF voucher requires a valid claim token', async function () {
+        const invalid = await call(resultVoucherApi, {
+            url: '/api/result-pins/voucher?reference=' + reference + '&token=wrong'
+        });
+        assert.equal(invalid.statusCode, 404);
+
+        const valid = await call(resultVoucherApi, {
+            url: '/api/result-pins/voucher?reference=' + reference + '&token=' + claimToken
+        });
+        assert.equal(valid.statusCode, 200);
+        assert.equal(valid.headers['content-type'], 'application/pdf');
+        assert.equal(String(valid.body).slice(0, 4), '%PDF');
+        assert.equal(String(valid.body).includes('1234567890'), true);
+    });
+
+    await t.test('receipt config is public and send outcomes are recorded', async function () {
+        const config = await call(resultEmailjsApi, { url: '/api/result-pins/emailjs' });
+        assert.equal(config.statusCode, 200);
+        assert.equal(config.body.enabled, true);
+        assert.equal(config.body.templateId, 'template_result_test');
+        assert.equal(Object.prototype.hasOwnProperty.call(config.body, 'privateKey'), false);
+
+        const recorded = await call(resultEmailedApi, postOptions({
+            reference: reference,
+            token: claimToken
+        }, { 'x-forwarded-for': '10.9.0.7' }));
+        assert.equal(recorded.statusCode, 200);
+        const order = await db.queryOne('SELECT emailedAt FROM result_orders WHERE reference = ?', [reference]);
+        assert.notEqual(order.emailedAt, null);
+    });
+
+    await t.test('admin can edit prices but cannot delete a sold PIN', async function () {
+        const save = await call(adminResultPinsApi, postOptions({
+            action: 'saveProducts',
+            products: [{
+                id: 'waec',
+                price: 5250,
+                cost: 2400,
+                portalUrl: 'https://www.waecdirect.org/',
+                instructions: 'Use your PIN on waecdirect.org.',
+                active: true
+            }]
+        }, { cookie: adminCookie }));
+        assert.equal(save.statusCode, 200);
+        assert.equal(save.body.products[0].cost, 2400);
+
+        const sold = await db.queryOne('SELECT id FROM result_pins WHERE orderRef = ?', [reference]);
+        const del = await call(adminResultPinsApi, postOptions({
+            action: 'deletePin',
+            id: Number(sold.id)
+        }, { cookie: adminCookie }));
+        assert.equal(del.statusCode, 409);
     });
 });

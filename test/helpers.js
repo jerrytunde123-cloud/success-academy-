@@ -93,6 +93,10 @@ function createRes() {
         },
         end: function (chunk) {
             this.headersSent = true;
+            if (Buffer.isBuffer(chunk)) {
+                this.body = chunk;
+                return;
+            }
             if (typeof chunk === 'string' && chunk.length > 0) {
                 try {
                     this.body = JSON.parse(chunk);

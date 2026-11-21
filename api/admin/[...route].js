@@ -9,6 +9,7 @@ const routes = {
     news: require('../../lib/handlers/admin/news'),
     orders: require('../../lib/handlers/admin/orders'),
     pins: require('../../lib/handlers/admin/pins'),
+    'result-pins': require('../../lib/handlers/admin/result-pins'),
     session: require('../../lib/handlers/admin/session'),
     stats: require('../../lib/handlers/admin/stats'),
     subjects: require('../../lib/handlers/admin/subjects'),

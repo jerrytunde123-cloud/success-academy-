@@ -14,6 +14,7 @@ var emailjsConfig = null;
 var editingNewsImages = [];
 var currentDeleteResolve = null;
 var currentDeleteRequiresPhrase = false;
+var resultData = null;
 
 function $(id) { return document.getElementById(id); }
 
@@ -152,6 +153,178 @@ function showCleanupWarning(result) {
     }
 }
 
+// ── Result PIN products, stock and orders ──────────────────────────────────
+
+function resultKey(id) {
+    return String(id).replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+function renderResultSettings(products) {
+    var container = $('result-products-form');
+    if (!container) {return;}
+    container.innerHTML = '';
+
+    (products || []).forEach(function (product) {
+        var key = resultKey(product.id);
+        var box = document.createElement('div');
+        box.className = 'upload-box';
+        box.innerHTML =
+            '<h4>' + escapeHtml(product.name) + ' — ' + Number(product.available) + ' available, ' + Number(product.sold) + ' sold</h4>' +
+            '<div class="row">' +
+                '<label style="width:120px;">Retail price (₦):</label>' +
+                '<input type="number" min="0" step="1" style="width:auto;" id="result-price-' + key + '" value="' + Number(product.price) + '">' +
+                '<label style="width:120px;">Cost price (₦):</label>' +
+                '<input type="number" min="0" step="1" style="width:auto;" id="result-cost-' + key + '" value="' + Number(product.cost) + '">' +
+                '<label><input type="checkbox" id="result-active-' + key + '"' + (product.active ? ' checked' : '') + '> Enabled</label>' +
+            '</div>' +
+            '<div class="row"><label style="width:120px;">Official portal:</label>' +
+                '<input type="url" id="result-portal-' + key + '" value="' + escapeHtml(product.portalUrl) + '"></div>' +
+            '<label style="display:block; margin-bottom:5px;">Customer instructions:</label>' +
+            '<textarea rows="3" id="result-instructions-' + key + '">' + escapeHtml(product.instructions) + '</textarea>';
+        container.appendChild(box);
+    });
+}
+
+function renderResultStock(stock) {
+    var body = $('result-stock-body');
+    if (!body) {return;}
+    body.innerHTML = '';
+    if (!stock || stock.length === 0) {
+        body.innerHTML = '<tr><td colspan="8">No result PINs have been added yet.</td></tr>';
+        return;
+    }
+    stock.forEach(function (item) {
+        var row = document.createElement('tr');
+        var canDelete = item.status === 'available';
+        row.innerHTML =
+            '<td>' + Number(item.id) + '</td>' +
+            '<td>' + escapeHtml(item.productName || item.productId) + '</td>' +
+            '<td><strong>' + escapeHtml(item.pin) + '</strong></td>' +
+            '<td>' + escapeHtml(item.serial || '—') + '</td>' +
+            '<td>' + escapeHtml(item.batch || '—') + '</td>' +
+            '<td>' + escapeHtml(item.status) + '</td>' +
+            '<td>' + escapeHtml((item.email || '—') + (item.deviceId ? ' / ' + item.deviceId : '')) + '</td>' +
+            '<td>' + (canDelete
+                ? '<button type="button" class="danger-btn" onclick="withButtonLoading(this, \'Deleting...\', () => deleteResultPin(' + Number(item.id) + '))">Delete</button>'
+                : '—') + '</td>';
+        body.appendChild(row);
+    });
+}
+
+function renderResultOrders(orders) {
+    var body = $('result-orders-body');
+    if (!body) {return;}
+    body.innerHTML = '';
+    if (!orders || orders.length === 0) {
+        body.innerHTML = '<tr><td colspan="7">No result PIN orders yet.</td></tr>';
+        return;
+    }
+    orders.forEach(function (order) {
+        var row = document.createElement('tr');
+        var pending = order.status === 'pending';
+        row.innerHTML =
+            '<td>' + escapeHtml(order.reference) + '</td>' +
+            '<td>' + escapeHtml(order.productName || order.productId) + '</td>' +
+            '<td>₦' + Number(order.amount / 100).toLocaleString() + '</td>' +
+            '<td>' + escapeHtml(order.status) + (order.emailedAt ? ' / emailed' : '') + '</td>' +
+            '<td>' + escapeHtml(order.email) + '</td>' +
+            '<td>' + escapeHtml(String(order.createdAt).slice(0, 10)) + '</td>' +
+            '<td>' + (pending
+                ? '<button type="button" class="danger-btn" disabled title="Pending orders cannot be deleted">Delete</button>'
+                : '<button type="button" class="danger-btn" onclick="withButtonLoading(this, \'Deleting...\', () => deleteResultOrder(\'' + escapeHtml(order.reference) + '\'))">Delete</button>') + '</td>';
+        body.appendChild(row);
+    });
+}
+
+async function loadResultData() {
+    try {
+        resultData = await api('/admin/result-pins');
+        renderResultSettings(resultData.products);
+        renderResultStock(resultData.stock);
+        renderResultOrders(resultData.orders);
+
+        var select = $('result-stock-product');
+        if (select) {
+            var previous = select.value;
+            select.innerHTML = '<option value="">-- Select Product --</option>';
+            (resultData.products || []).forEach(function (product) {
+                select.innerHTML += '<option value="' + escapeHtml(product.id) + '">' + escapeHtml(product.name) + '</option>';
+            });
+            if (previous) {select.value = previous;}
+        }
+        setText('result-settings-status', '');
+    } catch (err) {
+        setText('result-settings-status', err.message);
+    }
+}
+
+window.saveResultProducts = async function () {
+    var products = (resultData && resultData.products) || [];
+    var updates = products.map(function (product) {
+        var key = resultKey(product.id);
+        return {
+            id: product.id,
+            price: $('result-price-' + key).value,
+            cost: $('result-cost-' + key).value,
+            active: $('result-active-' + key).checked,
+            portalUrl: $('result-portal-' + key).value,
+            instructions: $('result-instructions-' + key).value
+        };
+    });
+    if (updates.length === 0) {return;}
+    try {
+        var data = await api('/admin/result-pins', { method: 'POST', body: { action: 'saveProducts', products: updates } });
+        resultData.products = data.products;
+        renderResultSettings(data.products);
+        setText('result-settings-status', 'Prices and settings saved.');
+    } catch (err) {
+        setText('result-settings-status', err.message);
+    }
+};
+
+window.addResultPins = async function () {
+    var productId = $('result-stock-product').value;
+    var lines = $('result-stock-lines').value;
+    var batch = $('result-stock-batch').value.trim();
+    if (!productId) {return alert('Select a product first.');}
+    if (!lines.trim()) {return alert('Enter at least one PIN or token.');}
+    try {
+        var data = await api('/admin/result-pins', {
+            method: 'POST',
+            body: { action: 'addPins', productId: productId, lines: lines, batch: batch }
+        });
+        var message = 'Added ' + data.added + ' PIN(s).';
+        if (data.skipped) {message += ' Skipped ' + data.skipped + ' duplicate(s).';}
+        $('result-stock-lines').value = '';
+        setText('result-add-status', message);
+        await loadResultData();
+    } catch (err) {
+        setText('result-add-status', err.message);
+    }
+};
+
+window.deleteResultPin = async function (id) {
+    var confirmed = await confirmDeletion('Delete this PIN?', 'This stock record will be removed permanently.', false);
+    if (!confirmed) {return;}
+    try {
+        await api('/admin/result-pins', { method: 'POST', body: { action: 'deletePin', id: Number(id) } });
+        await loadResultData();
+    } catch (err) {
+        alert(err.message);
+    }
+};
+
+window.deleteResultOrder = async function (reference) {
+    var confirmed = await confirmDeletion('Delete this order?', 'The sold PIN record stays in stock history.', false);
+    if (!confirmed) {return;}
+    try {
+        await api('/admin/result-pins', { method: 'POST', body: { action: 'deleteOrder', reference: reference } });
+        await loadResultData();
+    } catch (err) {
+        alert(err.message);
+    }
+};
+
 window.checkPassword = async function () {
     var password = $('admin-password').value;
     var errorEl = $('login-error');
@@ -191,6 +364,7 @@ window.switchTab = async function (tabId, event) {
     }
 
     if (tabId === 'enquiries') { await loadEnquiries(); }
+    if (tabId === 'results') { await loadResultData(); }
     if (tabId === 'pins') { await loadPinHistory(); }
     if (tabId === 'orders') { await loadOrders(); }
     if (tabId === 'news') { await loadNews(); }

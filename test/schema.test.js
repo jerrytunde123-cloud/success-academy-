@@ -69,10 +69,19 @@ test('migrate() upgrades the legacy schema without losing existing data', async 
 
         const version = await adapter.query("SELECT value FROM meta WHERE key = 'schema_version'");
         assert.equal(version[0].value, String(SCHEMA_VERSION));
+        assert.equal(SCHEMA_VERSION, 5);
+
+        const resultProducts = await adapter.query('SELECT * FROM result_products');
+        assert.equal(resultProducts.length, 2);
+        const waecProduct = resultProducts.find(function (product) { return product.id === 'waec'; });
+        const necoProduct = resultProducts.find(function (product) { return product.id === 'neco'; });
+        assert.equal(waecProduct && Number(waecProduct.priceKobo), 525000);
+        assert.equal(necoProduct && Number(necoProduct.priceKobo), 240000);
 
         const tables = await adapter.query("SELECT name FROM sqlite_master WHERE type = 'table'");
         const names = tables.map(function (row) { return row.name; });
-        ['orders', 'tutorial_orders', 'rate_limits', 'meta', 'exams', 'pins', 'enquiries', 'news', 'visitors'].forEach(function (table) {
+        ['orders', 'tutorial_orders', 'rate_limits', 'meta', 'exams', 'pins', 'enquiries', 'news', 'visitors',
+            'result_products', 'result_pins', 'result_orders'].forEach(function (table) {
             assert.equal(names.indexOf(table) !== -1, true, 'missing table: ' + table);
         });
 

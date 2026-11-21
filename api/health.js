@@ -3,7 +3,7 @@ const { ensureSchema } = require('../lib/schema');
 const { isDbConfigured, query } = require('../lib/db');
 const { isPaystackConfigured } = require('../lib/paystack');
 const { isR2Configured } = require('../lib/r2');
-const { isEmailJSConfigured } = require('../lib/emailjs');
+const { isEmailJSConfigured, isResultEmailJSConfigured } = require('../lib/emailjs');
 
 module.exports = handle(async function (req, res) {
     if (!method(req, res, ['GET'])) {
@@ -16,6 +16,7 @@ module.exports = handle(async function (req, res) {
         payments: isPaystackConfigured(),
         storage: isR2Configured(),
         email: isEmailJSConfigured(),
+        resultEmail: isResultEmailJSConfigured(),
         admin: Boolean(process.env.ADMIN_PASSWORD),
         time: new Date().toISOString()
     };
