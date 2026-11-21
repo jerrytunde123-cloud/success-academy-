@@ -1119,11 +1119,11 @@ async function sendResultEmail(data) {
 
     var config = await loadResultEmailConfig();
     if (!config) {
-        setStatus('Automatic email is not configured. Download your PDF voucher instead.', '#b42318');
+        setStatus('Email is not available. Use the download button.', '#b42318');
         return;
     }
     if (!await waitForEmailJS()) {
-        setStatus('Email service could not load. Download your PDF voucher instead.', '#b42318');
+        setStatus('Email could not load. Use the download button.', '#b42318');
         return;
     }
 
@@ -1151,7 +1151,7 @@ async function sendResultEmail(data) {
             }
         );
     } catch (error) {
-        setStatus('Email could not be sent. Use the download button or retry.', '#b42318');
+        setStatus('Email failed. Retry or use the download button.', '#b42318');
         if (retry) {retry.style.display = 'inline-block';}
         return;
     }
@@ -1165,7 +1165,7 @@ async function sendResultEmail(data) {
     } catch (_err) {
         // The receipt was sent; recording the outcome is best-effort.
     }
-    setStatus('Sent to ' + (data.email || 'your email') + '. Check your inbox and spam folder.', 'green');
+    setStatus('Sent to ' + (data.email || 'your email') + '. Check your inbox.', 'green');
     if (retry) {retry.style.display = 'none';}
 }
 
@@ -1203,7 +1203,7 @@ function showResultSuccess(data) {
         };
     }
 
-    setResultText('result-email-status', 'Preparing your email...');
+    setResultText('result-email-status', 'Sending email...');
     panel.style.display = 'block';
     panel.scrollIntoView({ block: 'center' });
     sendResultEmail(data);

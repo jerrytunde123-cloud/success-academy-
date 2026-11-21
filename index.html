@@ -103,11 +103,11 @@
         <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
         <h2 class="section-title">WAEC &amp; NECO Result Checker PINs</h2>
         <p style="text-align:center; color:#666; margin-top:-15px; margin-bottom:20px;">
-            Buy a genuine result-checker PIN or token. It appears below, downloads as a PDF voucher, and is sent to your email.
+            Buy a WAEC or NECO result checker PIN. Your PIN appears here after payment.
         </p>
 
         <div style="background:#f8f9fa; padding:18px; border-radius:8px; margin-bottom:20px;">
-            <label for="result-email" style="display:block; font-weight:600; margin-bottom:6px;">Email for your PIN and receipt</label>
+            <label for="result-email" style="display:block; font-weight:600; margin-bottom:6px;">Email address</label>
             <input type="email" id="result-email" autocomplete="email" placeholder="you@example.com" style="width:100%; padding:12px; border:1px solid #ccc; border-radius:5px; box-sizing:border-box;">
         </div>
 
@@ -121,8 +121,8 @@
             <p id="result-serial-line" style="display:none;">Serial: <strong id="result-serial"></strong></p>
             <p id="result-reference-line" style="font-size:12px; color:#888;"></p>
             <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:20px 0;">
-                <button id="result-download-btn" class="btn-buy" style="width:auto;"><i class="fas fa-download"></i> Download PDF Voucher</button>
-                <button id="result-email-retry" class="btn-buy" style="width:auto; background:#0088cc; display:none;">Retry Sending Email</button>
+                <button id="result-download-btn" class="btn-buy" style="width:auto;"><i class="fas fa-download"></i> Download Voucher</button>
+                <button id="result-email-retry" class="btn-buy" style="width:auto; background:#0088cc; display:none;">Retry Email</button>
             </div>
             <p id="result-email-status" style="font-size:13px; color:#666;"></p>
             <a id="result-portal-link" href="#" target="_blank" rel="noopener noreferrer" style="color:#0088cc;">Check your result on the official portal</a>
@@ -222,6 +222,6 @@
 
     <script async src="https://js.paystack.co/v2/inline.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@5/dist/email.min.js"></script>
-    <script src="script.js?v=19"></script>
+    <script src="script.js?v=20"></script>
 </body>
 </html>
