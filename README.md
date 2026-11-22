@@ -46,7 +46,7 @@ success-academy/
 6. `GET /api/config` returns the Paystack public key (safe to expose) and whether payments are enabled. The key comes from `PAYSTACK_PUBLIC_KEY`, falling back to the built-in key in `lib/paystack.js`.
 7. Tutorial enrollment is configured per exam in the admin dashboard. A priced tutorial must have a secure HTTPS class link to be listed publicly. `POST /api/tutorials` creates a pending order with a snapshot of the class link and initializes Paystack; after checkout, the server verifies the stored reference, amount, and currency before returning that link, even if the admin later changes the listing. The same verification works when Paystack returns the browser to the site.
 8. Admin enquiry replies are sent from the admin browser with the **EmailJS** SDK, using the public key/service/template IDs returned by `GET /api/admin/emailjs` (admin-only, env-driven). The browser sends `to_email` and a raw HTML body in `{{{html}}}`. Once EmailJS confirms delivery, the browser calls `POST /api/admin/enquiries` with `recordOnly: true` so the server records `repliedAt`. The backend never holds an EmailJS private key or sends the reply itself.
-9. Result PINs are a separate product: admin buys WAEC/NECO credentials and adds them to stock; buyers pay through Paystack using `POST /api/result-pins/checkout`. The server reserves one PIN, verifies the transaction in `POST /api/result-pins/claim`, and returns the credential plus a download token. `/result-pins` shows the PIN, offers a PDF voucher, and sends a receipt through EmailJS from the buyer's browser using the **same template** as admin replies. The PDF itself is generated on the server only after a verified claim; the server never sends email.
+9. Exam PINs are a separate product: admin buys credentials (e.g. WAEC/NECO/NABTEB result checker PINs or JAMB UTME/DE ePINs) and adds them to stock; buyers pay through Paystack using `POST /api/result-pins/checkout`. The server reserves one PIN, verifies the transaction in `POST /api/result-pins/claim`, and returns the credential plus a download token. `/result-pins` lists available products, shows the PIN after purchase, offers a PDF voucher, and sends a receipt through EmailJS from the buyer's browser using the **same template** as admin replies. The PDF itself is generated on the server only after a verified claim; the server never sends email.
 
 ## Environment variables
 
@@ -92,7 +92,7 @@ The schema is created and migrated lazily on the first API request. Migrations a
 - New columns: `exams.updatedAt`, `exams.tutorialPrice`, `exams.tutorialLink`, `exams.tutorialBenefits`, `pins.orderRef`, `pins.active`, `pins.lastUsedAt`, `enquiries.repliedAt`, `news.updatedAt`.
 - Existing PINs get `active = 1`, so previously issued PINs keep working.
 - Existing exams and PIN data are not overwritten. Missing default exams are seeded with `INSERT OR IGNORE`.
-- Version 5 adds `result_products`, `result_pins`, and `result_orders` for the WAEC/NECO PIN product, seeded with the current retail prices (WAEC ₦5,250, NECO ₦2,400).
+- Version 5 added `result_products`, `result_pins`, and `result_orders`; version 6 seeds additional default exam PIN products (including NABTEB result checker PIN and JAMB UTME/DE ePIN) alongside WAEC/NECO, with prices and availability editable from the admin dashboard.
 
 > If the database already contains important production data, take a Turso backup/exports before the first deployment. The migration is designed to preserve data, but a backup is always the safe move.
 
@@ -168,7 +168,7 @@ Tests use an in-memory `node:sqlite` database and a mocked Paystack API; they do
 Open `/admin` and log in with `ADMIN_PASSWORD`.
 
 - **Manage Exams** — edit package prices and availability; edit subject text answers, public thumbnails, and private Q&A images. Subject thumbnails and Q&A images can be removed.
-- **Result PINs** — a simple screen for the essentials: edit retail prices, enable or disable WAEC/NECO, add bulk stock (one `PIN, SERIAL` per line for WAEC; one 12-digit token per line for NECO), see available/sold counts, and review recent orders.
+- **Result PINs** — a simple screen for the essentials: edit retail prices, enable or disable products (WAEC, NECO, NABTEB, JAMB, etc.), add bulk stock (one `PIN, SERIAL` per line for products that require a serial; one PIN/token per line otherwise), see available/sold counts, and review recent orders.
 - **PIN History** — see every exam-answer PIN (paid and pending), create manual PINs for a device ID, and permanently delete PINs. Deleting a PIN revokes access but keeps any related order history.
 - **Orders** — review payment records. Pending orders cannot be deleted while payment may still complete. Deleting a paid order also deletes its linked PIN and revokes access.
 - **Manage News** — publish/edit/delete updates and upload up to 5 images.
