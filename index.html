@@ -21,8 +21,6 @@
             <ul>
                 <li><a href="/" data-page="home">Home</a></li>
                 <li><a href="/updates" data-page="updates">Updates</a></li>
-                <li><a href="/tutorials" data-page="tutorials">Tutorials</a></li>
-                <li><a href="/result-pins" data-page="results">Result PINs</a></li>
                 <li><a href="/my-pins" data-page="history">My PINs</a></li>
                 <li><a href="/view-content" data-page="verify">View Content</a></li>
             </ul>
@@ -100,10 +98,13 @@
     </main>
 
     <main id="page-results" style="display: none; padding: 40px 5%; max-width: 800px; margin: 0 auto;">
-        <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
-        <h2 class="section-title">WAEC &amp; NECO Result Checker PINs</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i> Back</button>
+            <button id="result-share-link-btn" class="btn-buy" style="width:auto; padding:10px 15px; background:#0088cc;"><i class="fas fa-link"></i> Copy Share Link</button>
+        </div>
+        <h2 class="section-title">Exam PINs</h2>
         <p style="text-align:center; color:#666; margin-top:-15px; margin-bottom:20px;">
-            Buy a WAEC or NECO result checker PIN. Your PIN appears here after payment.
+            Buy a result checker PIN. Your PIN appears here after payment.
         </p>
 
         <div style="background:#f8f9fa; padding:18px; border-radius:8px; margin-bottom:20px;">

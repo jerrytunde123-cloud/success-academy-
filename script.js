@@ -433,41 +433,32 @@ function renderExams() {
         card.appendChild(img); card.appendChild(title); grid.appendChild(card);
     });
 
-    // Result-checker PINs are a separate product from answer packages, but
-    // buyers still expect to find WAEC and NECO from the same home list.
-    [
-        { id: 'waec', name: 'WAEC Result PIN', logo: '/assets/waec-logo.png', note: 'Result checker e-PIN' },
-        { id: 'neco', name: 'NECO Result PIN', logo: '/assets/neco-logo.png', note: 'Result checker token' }
-    ].forEach(function (product) {
+    // Result-checker PINs are a separate product from answer packages; use a
+    // single entry point so the results page can list every available exam PIN.
+    (function () {
         var card = document.createElement('div');
         card.className = 'exam-card';
-        card.setAttribute('data-result-shortcut', product.id);
-        card.onclick = function () {
-            showPage('results', {
-                search: '?product=' + encodeURIComponent(product.id),
-                resultProduct: product.id
-            });
-        };
+        card.onclick = function () { showPage('results'); };
 
-        var fallbackImg = 'https://placehold.co/60x60/001f5b/ffcc00?text=' + encodeURIComponent(product.name.substring(0, 2));
+        var fallbackImg = 'https://placehold.co/60x60/001f5b/ffcc00?text=' + encodeURIComponent('EP');
         var img = document.createElement('img');
-        img.src = product.logo;
-        img.alt = product.name;
+        img.src = '/assets/logo.png';
+        img.alt = 'Exam PINs';
         img.onerror = function () { this.onerror = null; this.src = fallbackImg; };
 
         var title = document.createElement('h3');
         title.style.cssText = 'margin-top:10px; color:var(--primary-blue); font-size:16px;';
-        title.textContent = product.name;
+        title.textContent = 'Exam PINs';
 
         var note = document.createElement('p');
         note.style.cssText = 'font-size:12px; color:#666; margin:5px 0 0;';
-        note.textContent = product.note;
+        note.textContent = 'Buy result checker PINs';
 
         card.appendChild(img);
         card.appendChild(title);
         card.appendChild(note);
         grid.appendChild(card);
-    });
+    }());
 
     // ⚠️ ADD TUTORIAL CARD
     var tutCard = document.createElement('div');
@@ -1329,6 +1320,21 @@ function initSite() {
         }
     } catch (_err) {
         // The email can still be typed manually.
+    }
+
+    var resultShareBtn = document.getElementById('result-share-link-btn');
+    if (resultShareBtn) {
+        resultShareBtn.onclick = function () {
+            return withButtonLoading(resultShareBtn, 'Copying...', async function () {
+                var url = window.location.origin + window.location.pathname + window.location.search;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    alert('Shareable link copied: ' + url);
+                } catch (error) {
+                    alert('Could not copy the shareable link. ' + (error.message || ''));
+                }
+            });
+        };
     }
     var params = new URLSearchParams(window.location.search);
     if (params.get('reference') || params.get('trxref')) {
